@@ -16,7 +16,8 @@ User = get_user_model()
 
 def _validator():
     regex = RegexValidator(
-        r"^[a-b][a-b0-9_-]{1,63}$", message="字母开头, 由小写字母、数字、中横线、下划线组成，长度范围为2~64个字符"
+        r"^[a-b]([a-b0-9_-]){1,62}[a-b0-9]$",
+        message="由小写字母、数字、中横线、下划线组成，字母开头、字母或数据结尾，长度范围为2~64",
     )
     return regex
 
@@ -63,7 +64,7 @@ class TreeNode(BaseTimeModel):
     # 树的根结点深度为1
     depth = models.SmallIntegerField(verbose_name="深度", default=1)
     # 为了保证叶子结点name全局唯一，且有些数据库例如mysql不支持 UniqueConstraint按照条件约束
-    node_hash = models.CharField(verbose_name="结点哈希值", unique=True, max_length=32, db_index=True)
+    node_hash = models.CharField(verbose_name="结点哈希值", unique=True, max_length=32, db_index=True, default="")
 
     objects = TreeNodeManager()
 

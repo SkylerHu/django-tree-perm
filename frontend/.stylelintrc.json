@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "indentation": 2,
+    "comment-empty-line-before": null,
+    "no-invalid-double-slash-comments": null,
+    "no-descending-specificity": null,
+    "declaration-empty-line-before": null
+  },
+  "ignoreFiles": ["**/*.{js,jsx}"]
+}

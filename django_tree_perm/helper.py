@@ -10,29 +10,10 @@ from django_tree_perm import exceptions
 from django_tree_perm.models import TreeNode, NodeRole
 
 
-class TreeHelper(object):
+class TreeNodeHelper(object):
 
     def __init__(self, **kwargs):
         self.node = get_object_or_404(TreeNode, **kwargs)
-
-    @classmethod
-    def find_parent_node(cls, parent=None, parent_id=None, parent_path=None, required=False):
-        try:
-            if not parent and parent_id:
-                parent = TreeNode.objects.get(id=parent_id)
-            if not parent and parent_path:
-                parent = TreeNode.objects.get(path=parent_path)
-        except ObjectDoesNotExist:
-            pass
-
-        if parent:
-            if parent.is_key:
-                raise exceptions.ParamsValidateException("This key node is not allowed to be a parent node.")
-            if parent.disabled:
-                raise exceptions.ParamsValidateException("This node is disabled.")
-        elif required:
-            raise exceptions.ParamsValidateException("Parent node not found, and cannot be null.")
-        return parent
 
     @classmethod
     def add_node(cls, name, alias="", description="", parent=None, parent_id=None, parent_path=None, is_key=False):
@@ -149,6 +130,25 @@ class TreeHelper(object):
         node.save()
 
         return cls(node)
+
+    @classmethod
+    def find_parent_node(cls, parent=None, parent_id=None, parent_path=None, required=False):
+        try:
+            if not parent and parent_id:
+                parent = TreeNode.objects.get(id=parent_id)
+            if not parent and parent_path:
+                parent = TreeNode.objects.get(path=parent_path)
+        except ObjectDoesNotExist:
+            pass
+
+        if parent:
+            if parent.is_key:
+                raise exceptions.ParamsValidateException("This key node is not allowed to be a parent node.")
+            if parent.disabled:
+                raise exceptions.ParamsValidateException("This node is disabled.")
+        elif required:
+            raise exceptions.ParamsValidateException("Parent node not found, and cannot be null.")
+        return parent
 
 
 class PermHelper(object):

@@ -35,7 +35,7 @@ clean-pyc: ## remove Python file artifacts
 	find . -name '__pycache__' -exec rm -fr {} +
 
 clean-test: ## remove test and coverage artifacts
-	 rm -fr .tox/
+	rm -fr .tox/
 	rm -fr .coverage
 	rm -fr .pytest_cache
 	rm -fr htmlcov/
@@ -67,3 +67,7 @@ dist: clean-build ## builds source
 
 install: clean-build ## install the package to the active Python's site-packages
 	${PYTHON} setup.py install
+
+build-static: ## build frontend and copy to django_tree_perm static directory
+	cd frontend && rm -rf build && npm run build && cd ..
+	rsync -avc --delete frontend/build/ django_tree_perm/static/tree_perm/
