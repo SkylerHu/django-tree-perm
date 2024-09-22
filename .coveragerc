@@ -1,0 +1,13 @@
+[run]
+branch = True
+data_file = .coverage/coverage
+source =
+    django_tree_perm
+omit =
+    *test*.py
+
+[report]
+show_missing = True
+
+[html]
+directory = .coverage/htmlcov

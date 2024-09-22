@@ -1,0 +1,9 @@
+include README.md
+include LICENSE
+
+recursive-include tests *
+recursive-include django_tree_perm/ *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+
+recursive-include docs README.md Makefile LICENSE
