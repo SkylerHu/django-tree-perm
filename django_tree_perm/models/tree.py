@@ -8,7 +8,7 @@ from django.contrib.auth import get_user_model
 
 from django_tree_perm import settings
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
-from .manager import TreeNodeManager
+from .manager import TreeNodeManager, TreeNodeQuerySet
 
 
 User = get_user_model()
@@ -16,7 +16,7 @@ User = get_user_model()
 
 def _validator():
     regex = RegexValidator(
-        r"^[a-b]([a-b0-9_-]){1,62}[a-b0-9]$",
+        r"^[a-z]([a-z0-9_-]){0,62}[a-z0-9]$",
         message="由小写字母、数字、中横线、下划线组成，字母开头、字母或数据结尾，长度范围为2~64",
     )
     return regex
@@ -43,9 +43,9 @@ class TreeNode(BaseTimeModel):
             models.Index(fields=["is_key", "disabled", "name"]),
         ]
 
-    name = models.CharField(verbose_name="唯一标识", max_length=64, db_index=True, validators=[_validator()])
-    alias = models.CharField(verbose_name="显示名称", max_length=128, default="")
-    description = models.CharField(verbose_name="描述", max_length=1024, default="")
+    name = models.CharField(verbose_name="标识", max_length=64, db_index=True, validators=[_validator()])
+    alias = models.CharField(verbose_name="显示名称", max_length=64, default="", blank=True)
+    description = models.CharField(verbose_name="描述", max_length=1024, default="", blank=True)
     # 父类结点为空时，表示是树的根结点
     parent = models.ForeignKey(
         "self",
@@ -60,13 +60,21 @@ class TreeNode(BaseTimeModel):
     # 叶子结点不可以删除，仅用于叶子结点
     disabled = models.BooleanField(verbose_name="是否禁用", default=False, db_index=True)
     # 以下字段不允许直接赋值更新
-    path = models.CharField(verbose_name="结点全路径", max_length=191, default="", db_index=True)
+    path = models.CharField(verbose_name="结点路径", max_length=191, default="", db_index=True, blank=True)
     # 树的根结点深度为1
     depth = models.SmallIntegerField(verbose_name="深度", default=1)
     # 为了保证叶子结点name全局唯一，且有些数据库例如mysql不支持 UniqueConstraint按照条件约束
-    node_hash = models.CharField(verbose_name="结点哈希值", unique=True, max_length=32, db_index=True, default="")
+    node_hash = models.CharField(
+        verbose_name="结点哈希值",
+        unique=True,
+        max_length=32,
+        db_index=True,
+        error_messages={
+            "unique": "结点已存在，请更换标识",
+        },
+    )
 
-    objects = TreeNodeManager()
+    objects = TreeNodeManager.from_queryset(TreeNodeQuerySet)()
 
     def __str__(self):
         return f"TreeNode:{self.id} {self.path}"
@@ -114,11 +122,12 @@ class TreeNode(BaseTimeModel):
         _hash = hashlib.md5(_value.encode("utf-8")).hexdigest()
         self.node_hash = _hash
 
-    def save(self, update_fields=None, **kwargs):
+    def validate_save(self, update_fields=None, **kwargs):
         self._patch_attrs()
+        self.full_clean()
         if update_fields:
             update_fields = list(set(update_fields) + set(self.TREE_SPECIAL_FIELDS))
-        super().save(update_fields=update_fields, **kwargs)
+        self.save(update_fields=update_fields, **kwargs)
 
 
 class PermRole(BaseTimeModel):

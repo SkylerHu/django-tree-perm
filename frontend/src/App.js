@@ -1,10 +1,15 @@
-import './App.css';
+import React from 'react';
+import { Row, Col } from 'antd';
+import TreeView from './TreeView';
+
 
 function App() {
   return (
-    <div className="App">
-      Hello World
-    </div>
+    <Row>
+      <Col span={8}>
+        <TreeView />
+      </Col>
+    </Row>
   );
 }
 

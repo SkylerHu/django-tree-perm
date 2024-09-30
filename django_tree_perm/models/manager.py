@@ -2,16 +2,18 @@
 # coding=utf-8
 from django.db import models
 
-from django_tree_perm import utils
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 
 
 class TreeNodeManager(models.Manager):
+    pass
 
-    def search_nodes(self, value=None):
+
+class TreeNodeQuerySet(models.QuerySet):
+    def search_nodes(self, value):
         # 搜索值为空，搜索无结果
-        queryset = self.filter(disabled=False)
-        if value is None:
+        queryset = self
+        if not value:
             return queryset
         # 传的值是path路径
         if TREE_SPLIT_NODE_FLAG in value:
@@ -29,18 +31,22 @@ class TreeNodeManager(models.Manager):
         qs = queryset.filter(name__contains=value)
         return qs
 
-    def search_keys(self, value=None):
-        queryset = self.filter(is_key=True, disabled=False)
+    def search_keys(self, value):
+        queryset = self.filter(is_key=True)
         queryset = queryset.search_nodes(value=value)
         return queryset.order_by("name")
 
-    def filter_by_perm(self, user_id, role_ids=None):
-        queryset = self.filter(disabled=False)
+    def filter_by_perm(self, user_id, role_names=None, role_ids=None):
+        queryset = self
 
         # 找出自己有权限的路径
-        from django_tree_perm.models import NodeRole
+        from django_tree_perm.models import NodeRole, PermRole
 
-        nr_qs = NodeRole.objects.filter(user_id=user_id, node__disabled=False)
+        nr_qs = NodeRole.objects.filter(user_id=user_id)
+        if role_names:
+            role_ids = list(PermRole.objects.filter(name__in=role_names).values_list("id", flat=True))
+            if not role_ids:
+                return queryset.none()
         if role_ids and len(role_ids) == 1:
             nr_qs = nr_qs.filter(role_id=role_ids[0])
         elif role_ids:
@@ -62,9 +68,9 @@ class TreeNodeManager(models.Manager):
         可以在调用之前多使用filter函数
         """
         queryset = self
-        if self.query.where:
-            paths = utils.get_tree_paths(list(self.values_list("path", flat=True)))
-            queryset = self.all().filter(path__in=paths)
+        # if search_up:
+        #     paths = utils.get_tree_paths(list(self.values_list("path", flat=True)))
+        #     queryset = self.all().filter(path__in=paths)
 
         tree = []
         # 以parent_id为key, value是数组--存放直接子结点

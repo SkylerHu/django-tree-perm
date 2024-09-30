@@ -11,7 +11,7 @@ urlpatterns = [
         "tree/",
         include(
             [
-                path("", views.TreeNodeView.as_view()),
+                path("nodes/", views.TreeNodeView.as_view()),
             ]
         ),
     ),

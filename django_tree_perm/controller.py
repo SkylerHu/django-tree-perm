@@ -10,10 +10,12 @@ from django_tree_perm import exceptions
 from django_tree_perm.models import TreeNode, NodeRole
 
 
-class TreeNodeHelper(object):
+class TreeNodeManger(object):
 
-    def __init__(self, **kwargs):
-        self.node = get_object_or_404(TreeNode, **kwargs)
+    def __init__(self, node=None, **kwargs):
+        if not node:
+            node = get_object_or_404(TreeNode, **kwargs)
+        self.node = node
 
     @classmethod
     def add_node(cls, name, alias="", description="", parent=None, parent_id=None, parent_path=None, is_key=False):
@@ -30,8 +32,8 @@ class TreeNodeHelper(object):
             "disabled": False,
         }
         node = TreeNode(**values)
-        node.save()
-        return cls(node)
+        node.validate_save()
+        return cls(node=node)
 
     def update_attrs(self, name=None, alias=None, description=None):
         node = self.node
@@ -46,7 +48,7 @@ class TreeNodeHelper(object):
             is_change = True
             node.description = description
         if is_change:
-            node.save()
+            node.validate_save()
 
     @transaction.atomic
     def move_path(self, parent=None, parent_id=None, parent_path=None):
@@ -73,26 +75,30 @@ class TreeNodeHelper(object):
             nodes.append(node)
             rows = TreeNode.objects.bulk_update(nodes, TreeNode.TREE_SPECIAL_FIELDS, batch_size=1000)
         else:
-            node.save()
+            node.validate_save()
             rows = 1
         return rows
 
     @transaction.atomic
-    def remove(self, clear_chidren=False):
+    def remove(self, clear_chidren=False, clear_roles=False):
         node = self.node
         if node.disabled:
             return 0
         if node.is_key:
             node.parent = None
             node.disabled = True
-            node.save()
-            # 清除结点相关用户权限
-            NodeRole.objects.filter(node_id=node.id).delete()
+            node.validate_save()
+            if clear_roles:
+                # 清除结点相关用户权限
+                NodeRole.objects.filter(node_id=node.id).delete()
             return 0
 
         has_children = node.children.exists()
         if has_children and not clear_chidren:
-            raise exceptions.ParamsValidateException("Deleted nodes cannot be selected.")
+            # 若是有子结点不允许直接删除
+            raise exceptions.ParamsValidateException(
+                "Deleting nodes that have child nodes is not allowed. Please pass parameter 'clear_chidren=True'"
+            )
 
         if not has_children:
             # 会级联删除相关用户权限
@@ -111,8 +117,9 @@ class TreeNodeHelper(object):
             node_ids.append(_node.id)
         if nodes:
             TreeNode.objects.bulk_update(nodes, TreeNode.TREE_SPECIAL_FIELDS, batch_size=1000)
-            # 清除结点相关用户权限
-            NodeRole.objects.filter(node_id__in=node_ids).delete()
+            if clear_roles:
+                # 清除结点相关用户权限
+                NodeRole.objects.filter(node_id__in=node_ids).delete()
         # 删除所有子结点
         row, _ = query_set.filter(is_key=False).delete()
         return row
@@ -127,9 +134,9 @@ class TreeNodeHelper(object):
 
         node.disabled = False
         node.parent = parent
-        node.save()
+        node.validate_save()
 
-        return cls(node)
+        return cls(node=node)
 
     @classmethod
     def find_parent_node(cls, parent=None, parent_id=None, parent_path=None, required=False):
@@ -151,7 +158,7 @@ class TreeNodeHelper(object):
         return parent
 
 
-class PermHelper(object):
+class PermManager(object):
 
     def __init__(self, user):
         self.user = user
