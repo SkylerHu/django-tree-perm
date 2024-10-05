@@ -1,11 +1,50 @@
-import React, { useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { PlusOutlined } from '@ant-design/icons';
-import { message, Tree, Input, Row, Col, Button, Modal, Form, Checkbox } from 'antd';
+import { PlusOutlined, SettingOutlined } from '@ant-design/icons';
+import { message, Tree, Input, Row, Col, Button, Modal, Form, Checkbox, Space, Dropdown } from 'antd';
+
+import * as Enum from 'js-enumerate';
 
 import SelectView from './restful-antd/components/SelectView'
 import { useProtect } from './restful-antd/hooks'
 import requests, { formatRequestError } from './restful-antd/requests'
+import { TreeApi } from './constants';
+
+const NodeMenu = new Enum([
+  { key: 'EDIT', value: 'edit', label: '修改信息' },
+  { key: 'ADD', value: 'add', label: '添加结点' },
+  { key: 'DELETE', value: 'delete', label: '删除结点', danger: true },
+]);
+
+/**
+ * 向树结构数据treeData中，将nodes插入作为某结点的chi˜ldren
+ * @param {*} treeData
+ * @param {*} parent_path
+ * @param {*} nodes
+ * @returns
+ */
+const insertChildren = (treeData, parent_path, nodes) => {
+  // 递归查找结点
+  const findNode = (data, path) => {
+    for (let i = 0; i < data.length; i++) {
+      const node = data[i];
+      if (node.path === path) {
+        return node;
+      }
+      if (node.path && node.path.startsWith(path) && node.children) {
+        return findNode(node.children, path)
+      }
+    }
+    return null;
+  };
+
+ const ret = findNode(treeData, parent_path);
+ if (!ret) {
+  return nodes;
+ }
+ ret.children = nodes;
+ return treeData;
+};
 
 
 const TreeView = ({
@@ -14,9 +53,20 @@ const TreeView = ({
 
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
+  // 编辑表单
   const [editModalVisiable, setEditModalVisiable] = useState(false);
   const [formRef] = Form.useForm();
+  // 编辑的结点
+  const [editNode, setEditNode] = useState();
+  // 树结构数据
+  const [treeData, setTreeData] = useState([]);
 
+  useEffect(() => {
+    requests.get(TreeApi.LAZY_LOAD).then(resp => {
+      const nodes = resp.data.results;
+      setTreeData(nodes);
+    });
+  }, [])
 
   return (
     <div style={{ width: '100%', height: '100%', padding: 10 }}>
@@ -38,8 +88,53 @@ const TreeView = ({
           />
         </Col>
       </Row>
+      <div style={{ height: 10 }}/>
       <Tree
-        treeData={[]}
+        treeData={treeData}
+        fieldNames={{
+          title: 'name',
+          key: 'id',
+        }}
+        titleRender={(node) => (
+          <Space>
+            <div>{node.alias ? `${node.name} (${node.alias})` : node.name}</div>
+            <Dropdown
+              menu={{
+                items: NodeMenu.options,
+                onClick: (menu) => {
+                  switch(menu.key) {
+                    case 'edit': {
+                      break;
+                    }
+                    case 'add_child': {
+                      break;
+                    }
+                    case 'delete': {
+                      break;
+                    }
+                    default:
+                      break;
+                  }
+                },
+              }}
+            >
+              <SettingOutlined />
+            </Dropdown>
+          </Space>
+        )}
+        loadData={(node) => new Promise((resolve) => {
+          if (node.children) {
+            resolve();
+            return;
+          }
+          requests.get(TreeApi.LAZY_LOAD, { params: { parent_path: node.path } }).then(protect(resp => {
+            const nodes = resp.data.results;
+            setTreeData((oldData) => {
+              insertChildren(oldData, node.path, nodes)
+              return oldData;
+            });
+          })).finally(protect(() => resolve()));
+        })}
       />
       <Modal
         title="新增结点"
@@ -50,7 +145,7 @@ const TreeView = ({
         onOk={() => {
           formRef.validateFields().then(protect((values) => {
             setLoading(true);
-            requests.post('tree/nodes/', values).then(protect((resp) => {
+            requests.post(TreeApi.NODE_LIST, values).then(protect((resp) => {
               message.success("操作成功");
               setEditModalVisiable(false);
             }), protect((error) => {
@@ -107,7 +202,7 @@ const TreeView = ({
             name="parent_id" label="父结点"
             help="无父类结点则新增的是根结点"
           >
-            <SelectView restful='tree/nodes/'/>
+            <SelectView restful={TreeApi.NODE_LIST} fieldNames={{ label: 'path', value: 'name' }}/>
           </Form.Item>
           <Form.Item
             name="is_key" label="绝对叶子结点"

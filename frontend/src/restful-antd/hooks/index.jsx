@@ -17,6 +17,9 @@ export function useProtect () {
 
       const callback = callbackRef.current[id];
       delete callbackRef.current[id];
+      if (!callback) {
+        return noop(...params);
+      }
       return callback(...params);
     }
     return myFunc;

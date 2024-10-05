@@ -56,7 +56,10 @@ instance.interceptors.request.use((config) => {
   const headers = { ...config.headers };
 
   if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(config.method.toUpperCase())) {
-    const csrftoken = getCookie('csrftoken');
+    let csrftoken = document.querySelector('[name=csrfmiddlewaretoken]')?.value;
+    if (!csrftoken) {
+      csrftoken = getCookie('csrftoken');
+    }
     headers['X-CSRFToken'] = csrftoken;
   }
 

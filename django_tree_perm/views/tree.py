@@ -6,12 +6,16 @@ from http import HTTPStatus
 from django.views import View
 from django.http import JsonResponse
 from django.core.paginator import Paginator
-from django.shortcuts import get_object_or_404
 from django.core.exceptions import ValidationError
+from django.shortcuts import get_object_or_404, render
 
 from django_tree_perm import exceptions
 from django_tree_perm.models import User, TreeNode
 from django_tree_perm.controller import TreeNodeManger
+
+
+def main_view(request):
+    return render(request, "tree_perm/main.html")
 
 
 class BaseView(View):

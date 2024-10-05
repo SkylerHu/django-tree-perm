@@ -38,6 +38,8 @@ class SettingsProxy(object):
     # 是否调试模式
     DEBUG = False
 
+    TREE_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
+
     def __getattribute__(self, attr: str) -> typing.Any:
         try:
             if attr in _BLACK_ATTRS:

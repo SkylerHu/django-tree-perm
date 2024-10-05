@@ -3,8 +3,8 @@
 import hashlib
 
 from django.db import models
-from django.core.validators import RegexValidator
 from django.contrib.auth import get_user_model
+from django.core.validators import RegexValidator
 
 from django_tree_perm import settings
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
@@ -90,8 +90,8 @@ class TreeNode(BaseTimeModel):
             "disabled": self.disabled,
             "path": self.path,
             "depth": self.depth,
-            "created_at": self.created_at.strftime(settings.DATETIME_FORMAT),
-            "updated_at": self.updated_at.strftime(settings.DATETIME_FORMAT),
+            "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
+            "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
         }
         return data
 

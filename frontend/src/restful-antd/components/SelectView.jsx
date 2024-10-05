@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Select, Spin } from 'antd';
 import {dequal as deepEqual} from 'dequal';
@@ -6,8 +6,6 @@ import {dequal as deepEqual} from 'dequal';
 import { useProtect } from '../hooks';
 import requests from '../requests';
 
-const _getOptionValue = (opt) => opt.value;
-const _getOptionLabel = (opt) => opt.label;
 const _parseListResponse = (data) => data?.results || [];
 
 const SelectView = ({
@@ -19,9 +17,13 @@ const SelectView = ({
   filters = null,
   searchKey = "search",
   parseListResponse = _parseListResponse,
+  initOptions,
 
-  getOptionValue = _getOptionValue,
-  getOptionLabel = _getOptionLabel,
+  fieldNames,
+  // labelKey = 'label',
+  // labelMethod,
+  // valueKey = 'value',
+  // valueMethod,
 
   disabled = false,
   mode,
@@ -38,7 +40,16 @@ const SelectView = ({
   const [searchValue, setSearchValue] = useState();
   const [loading, setLoading] = useState(false);
   // 下拉选项列表
-  const [innerOptions, setInnerOptions] = useState([]);
+  const [innerOptions, setInnerOptions] = useState(initOptions || []);
+
+  const getOptionValue = useCallback((item) => item[fieldNames?.value || 'value'], [fieldNames]);
+
+  const onValueChange = useCallback((value, option) => {
+    setInnverValue(value);
+    if (typeof onChange === 'function') {
+      onChange(value, option);
+    }
+  }, [onChange]);
 
   // 初始化是否多选
   useEffect(() => {
@@ -66,9 +77,12 @@ const SelectView = ({
     return [innerValue];
   }, [innerValue, isMultiple]);
 
-
   // 首次初始化
   useEffect(() => {
+    if (isMultiple) {
+      // 暂不支持多选
+      return
+    }
     if (innerValue === null || innerValue === undefined || innerValue === "") {
       return
     }
@@ -82,14 +96,14 @@ const SelectView = ({
     }
     console.log("fetchValues==>", fetchValues)
     // 根据restful接口获取详情数据初始化options
-    // const promiseArr = fetchValues.map(v => requests.get(typeof genDetailUri === 'function' ? genDetailUri(v) : `${restful}${v}/`));
-    // Promise.all(promiseArr).then(protect(respArr => {
-    //   const _options = respArr.map(resp => resp.data);
-    //   setOptions((oldOpts) => {
-    //     return _options.concat(oldOpts);
-    //   });
-    // }));
-  }, [getOptionValue, innerValue, protect, isMultiple, restful, genDetailUri]);
+    const promiseArr = fetchValues.map(v => requests.get(typeof genDetailUri === 'function' ? genDetailUri(v) : `${restful}${v}/`));
+    Promise.all(promiseArr).then(protect(respArr => {
+      const _options = respArr.map(resp => resp.data);
+      setInnerOptions((oldOpts) => {
+        return _options.concat(oldOpts);
+      });
+    }));
+  }, [getOptionValue, innerValue, protect, isMultiple, restful, genDetailUri, innerOptions]);
 
   useEffect(() => {
     // 搜索值变化时
@@ -136,15 +150,13 @@ const SelectView = ({
       placeholder="可输入关键内容搜索，从下拉列表中选择"
       {...antdSelectProps}
       mode={mode}
+      options={innerOptions}
+      fieldNames={fieldNames}
       value={innerValue}
-      onSearch={(v) => {console.log("onSearch", v); setSearchValue(v)}}
       showSearch={true}
-      onSelect={(value, option) => {
-        setInnverValue(value);
-        if (typeof onChange === 'function') {
-          onChange(value, option);
-        }
-      }}
+      onSearch={(v) => setSearchValue(v)}
+      onClear={() => onValueChange(null)}
+      onSelect={(value, option) => onValueChange(value, option)}
     />
   );
 };
@@ -161,9 +173,9 @@ SelectView.propTypes = {
   // 模糊搜索使用的key
   searchKey: PropTypes.string,
   parseListResponse: PropTypes.func,
+  initOptions: PropTypes.arrayOf(PropTypes.object),
 
-  getOptionValue: PropTypes.func,
-  getOptionLabel: PropTypes.func,
+  fieldNames: PropTypes.object,
 
   // 默认单选，多选：multiple
   mode: PropTypes.string,
