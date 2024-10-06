@@ -25,8 +25,8 @@ class TreeNodeManger(object):
             raise exceptions.ParamsValidateException("Leaf nodes are not allowed to be root node.")
         values = {
             "name": name,
-            "alias": alias,
-            "description": description,
+            "alias": alias or "",
+            "description": description or "",
             "parent": parent,
             "is_key": is_key,
             "disabled": False,
@@ -35,20 +35,27 @@ class TreeNodeManger(object):
         node.validate_save()
         return cls(node=node)
 
-    def update_attrs(self, name=None, alias=None, description=None):
+    @transaction.atomic
+    def update_attrs(self, name=None, alias=None, description=None, parent_id=None):
         node = self.node
         is_change = False
         if name and node.name != name:
+            if node.is_key:
+                raise exceptions.ParamsValidateException("The is_key node does not allow edit name.")
             is_change = True
             node.name = name
-        if alias is not alias and node.alias != alias:
+        if alias is not None and node.alias != alias:
             is_change = True
             node.alias = alias
         if description is not None and node.description != description:
             is_change = True
             node.description = description
+
         if is_change:
             node.validate_save()
+
+        if parent_id and node.parent_id != parent_id:
+            self.move_path(parent_id=parent_id)
 
     @transaction.atomic
     def move_path(self, parent=None, parent_id=None, parent_path=None):
@@ -64,19 +71,18 @@ class TreeNodeManger(object):
         node.parent = parent
         # 要更新所有子结点path属性
         old_prefix = node.path_prefix  # 提前记录旧的树路径
+        # 优先更新结点自身
+        node.validate_save()
+        rows = 1
+
         nodes = list(TreeNode.objects.filter(path__startswith=old_prefix))
         if nodes:
-            node._patch_attrs()
             new_prefix = node.path_prefix
             for _node in nodes:
                 re_prefix = old_prefix.replace(".", "\\.")
                 _node.path = re.sub(rf"^{re_prefix}", new_prefix, _node.path, flags=0)
                 _node._patch_attrs()
-            nodes.append(node)
-            rows = TreeNode.objects.bulk_update(nodes, TreeNode.TREE_SPECIAL_FIELDS, batch_size=1000)
-        else:
-            node.validate_save()
-            rows = 1
+            rows += TreeNode.objects.bulk_update(nodes, TreeNode.TREE_SPECIAL_FIELDS, batch_size=1000)
         return rows
 
     @transaction.atomic

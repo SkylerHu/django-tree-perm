@@ -13,6 +13,8 @@ urlpatterns = [
         include(
             [
                 path("nodes/", views.TreeNodeView.as_view()),
+                path("nodes/<int:node_id>/", views.TreeNodeEditView.as_view()),
+                path("nodes/load/", views.TreeLoadView.as_view()),
                 path("nodes/lazyload/", views.TreeLazyLoadView.as_view()),
             ]
         ),

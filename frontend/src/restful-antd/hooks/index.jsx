@@ -1,46 +1,47 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { useEffect, useRef } from 'react';
+
+function protectFromUnmount() {
+
+  let callbacks = {};
+  let count = 0;
+  const noop = (...value) => value;
+
+  const wrapCallback = id => function(...params) {
+    const raceSafeCallbacks = callbacks;
+
+    const callback = raceSafeCallbacks[id];
+    delete raceSafeCallbacks[id];
+    if (!callback) {
+      return noop(...params);
+    }
+    return callback(...params);
+  };
+
+  const protect = (callback) => {
+    const raceSafeCallbacks = callbacks;
+
+    const id = count++;
+    raceSafeCallbacks[id] = callback;
+    return wrapCallback(id);
+  };
+
+  protect.unmount = () => callbacks = {};
+
+  return protect;
+}
 
 /**
  *  主要用于数据请求时
  */
 export function useProtect () {
-
-  const callbackRef = useRef({});
-  const countRef = useRef(0);
-
-  const noop = (...values) => values;
-
-  const wrapCallback = useCallback((id) => {
-    const myFunc = (...params) => {
-      if (!callbackRef.current)
-        return noop(...params);
-
-      const callback = callbackRef.current[id];
-      delete callbackRef.current[id];
-      if (!callback) {
-        return noop(...params);
-      }
-      return callback(...params);
-    }
-    return myFunc;
-  }, []);
-
-  const protect = useCallback((callback) => {
-    if (!callbackRef.current)
-      return noop;
-
-    const id = countRef.current++;
-    callbackRef.current[id] = callback;
-
-    return wrapCallback(id);
-  }, [wrapCallback]);
+  const protectRef = useRef(protectFromUnmount());
 
   useEffect(() => {
-    callbackRef.current = {};
+    protectRef.current = protectFromUnmount();
     return () => {
-      callbackRef.current = null;
+      protectRef.current && protectRef.current.unmount();
     };
   }, []);
 
-  return [protect];
+  return [protectRef.current];
 }

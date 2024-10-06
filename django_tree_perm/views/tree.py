@@ -63,8 +63,26 @@ class TreeNodeView(BaseView):
 
 class TreeNodeEditView(BaseView):
 
-    def patch(self, request, *args, **kwargs):
-        pass
+    def get(self, request, *args, node_id=None, **kwargs):
+        node = get_object_or_404(TreeNode, pk=node_id)
+        return JsonResponse(node.to_json(), status=HTTPStatus.OK)
+
+    def patch(self, request, *args, node_id=None, **kwargs):
+        node = get_object_or_404(TreeNode, pk=node_id)
+
+        try:
+            data = self.parese_request_body(request)
+            print("data===>", data)
+            manager = TreeNodeManger(node=node)
+            manager.update_attrs(
+                name=data.get("name"),
+                alias=data.get("alias"),
+                description=data.get("description"),
+                parent_id=data.get("parent_id"),
+            )
+        except (ValidationError, exceptions.ParamsValidateException) as e:
+            return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+        return JsonResponse(manager.node.to_json(), status=HTTPStatus.CREATED)
 
     def delete(self, request, *args, **kwargs):
         pass
@@ -92,5 +110,13 @@ class TreeLazyLoadView(BaseView):
 class TreeLoadView(BaseView):
     def get(self, request, *args, **kwargs):
         search = request.GET.get("search", None)
+        depth = request.GET.get("depth", None)
 
         queryset = TreeNode.objects.filter(disabled=False)
+        if depth:
+            queryset = queryset.filter(depth__lte=depth)
+        if search:
+            queryset = queryset.search_nodes(search)
+        data = queryset.to_json_tree()
+
+        return JsonResponse({"results": data}, status=HTTPStatus.OK)

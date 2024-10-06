@@ -8,11 +8,11 @@ export function formatRequestError (error) {
     switch (status) {
       case 401: {
         msg = '未登录';
-        break
+        break;
       }
       case 403: {
         msg = '未授权禁止操作';
-        break
+        break;
       }
       default: {
         msg = error.response.data;
@@ -22,8 +22,10 @@ export function formatRequestError (error) {
         break;
       }
     }
-    if (error.response.status)
-    err_msg = `HttpError(${status}): ${msg}`;
+    if (error.response.status) {
+      err_msg = `HttpError(${status}): ${msg}`;
+    }
+
   }
   return { err_msg };
 }
@@ -31,22 +33,22 @@ export function formatRequestError (error) {
 
 const instance = axios.create({
   timeout: 10000,
-  headers: {'Content-Type': 'application/json'},
+  headers: { 'Content-Type': 'application/json' },
 });
 
 
 function getCookie (name) {
   let cookieValue = null;
   if (document.cookie && document.cookie !== '') {
-      const cookies = document.cookie.split(';');
-      for (let i = 0; i < cookies.length; i++) {
-          const cookie = cookies[i].trim();
-          // Does this cookie string begin with the name we want?
-          if (cookie.substring(0, name.length + 1) === (name + '=')) {
-              cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-              break;
-          }
+    const cookies = document.cookie.split(';');
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i].trim();
+      // Does this cookie string begin with the name we want?
+      if (cookie.substring(0, name.length + 1) === (name + '=')) {
+        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+        break;
       }
+    }
   }
   return cookieValue;
 }

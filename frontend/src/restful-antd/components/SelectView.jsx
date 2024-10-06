@@ -1,12 +1,12 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useRef, useState, useEffect, useMemo, useCallback } from 'react';
 import PropTypes from 'prop-types';
 import { Select, Spin } from 'antd';
-import {dequal as deepEqual} from 'dequal';
+import { dequal as deepEqual } from 'dequal';
 
 import { useProtect } from '../hooks';
 import requests from '../requests';
 
-const _parseListResponse = (data) => data?.results || [];
+const _parseListResponse = data => data?.results || [];
 
 const SelectView = ({
   value,
@@ -15,21 +15,16 @@ const SelectView = ({
   restful,
   genDetailUri = null,
   filters = null,
-  searchKey = "search",
+  searchKey = 'search',
   parseListResponse = _parseListResponse,
   initOptions,
 
   fieldNames,
-  // labelKey = 'label',
-  // labelMethod,
-  // valueKey = 'value',
-  // valueMethod,
 
   disabled = false,
   mode,
   antdSelectProps = {},
 }) => {
-
   const [protect] = useProtect();
 
   // 是否多选
@@ -41,24 +36,29 @@ const SelectView = ({
   const [loading, setLoading] = useState(false);
   // 下拉选项列表
   const [innerOptions, setInnerOptions] = useState(initOptions || []);
+  // 已经初始化过options,有可能会404,不重复获取
+  const fetchedValues = useRef(new Set());
 
-  const getOptionValue = useCallback((item) => item[fieldNames?.value || 'value'], [fieldNames]);
+  const getOptionValue = useCallback(item => item[fieldNames?.value || 'value'], [fieldNames]);
 
-  const onValueChange = useCallback((value, option) => {
-    setInnverValue(value);
-    if (typeof onChange === 'function') {
-      onChange(value, option);
-    }
-  }, [onChange]);
+  const onValueChange = useCallback(
+    (value, option) => {
+      setInnverValue(value);
+      if (typeof onChange === 'function') {
+        onChange(value, option);
+      }
+    },
+    [onChange],
+  );
 
   // 初始化是否多选
   useEffect(() => {
-    setMultiple(mode === 'multiple')
-  }, [mode])
+    setMultiple(mode === 'multiple');
+  }, [mode]);
 
   // 初始化值
   useEffect(() => {
-    setInnverValue((oldValue) => {
+    setInnverValue(oldValue => {
       if (deepEqual(oldValue, value)) {
         return oldValue;
       }
@@ -81,52 +81,65 @@ const SelectView = ({
   useEffect(() => {
     if (isMultiple) {
       // 暂不支持多选
-      return
+      return;
     }
-    if (innerValue === null || innerValue === undefined || innerValue === "") {
-      return
+    if (innerValue === null || innerValue === undefined || innerValue === '') {
+      return;
     }
     // 初始化已被选中的options
     const values = isMultiple ? innerValue : [innerValue];
     const optValues = innerOptions.map(opt => getOptionValue(opt));
     // 没有options的选中项
-    const fetchValues = values.filter(v => !optValues.includes(v));
+    const fetchValues = values.filter(v => !optValues.includes(v) && !fetchedValues.current.has(v));
     if (!fetchValues.length) {
-      return
+      return;
     }
-    console.log("fetchValues==>", fetchValues)
+    fetchValues.forEach(v => fetchedValues.current.add(v));
     // 根据restful接口获取详情数据初始化options
-    const promiseArr = fetchValues.map(v => requests.get(typeof genDetailUri === 'function' ? genDetailUri(v) : `${restful}${v}/`));
-    Promise.all(promiseArr).then(protect(respArr => {
-      const _options = respArr.map(resp => resp.data);
-      setInnerOptions((oldOpts) => {
-        return _options.concat(oldOpts);
-      });
-    }));
-  }, [getOptionValue, innerValue, protect, isMultiple, restful, genDetailUri, innerOptions]);
+    const promiseArr = fetchValues.map(v =>
+      requests.get(typeof genDetailUri === 'function' ? genDetailUri(v) : `${restful}${v}/`),
+    );
+    Promise.all(promiseArr).then(
+      protect(respArr => {
+        const _options = respArr.map(resp => resp.data);
+        setInnerOptions(oldOpts => {
+          const opts = _options.concat(oldOpts);
+          return opts;
+        });
+      }),
+    );
+  }, [protect, getOptionValue, innerValue, isMultiple, restful, genDetailUri, innerOptions]);
 
   useEffect(() => {
     // 搜索值变化时
     if (disabled || !restful || !searchValue) {
       return;
     }
-    const timer = setTimeout(protect(() => {
-      let params = {...filters};
-      if (searchValue) {
-        params[searchKey] = searchValue;
-      }
-      setLoading(true);
-      requests.get(restful, { params })
-        .then(protect(response => {
-          const results = parseListResponse(response.data);
-          setInnerOptions((oldOpts) => {
-            const selectedOpts = oldOpts.filter(opt => selectedValues.includes(getOptionValue(opt)));
-            const _values = oldOpts.map(opt => getOptionValue(opt));
-            const addOpts = results.filter(opt => !_values.includes(getOptionValue(opt)));
-            return selectedOpts.concat(addOpts);
-          });
-        }), protect(() => {})).finally(protect(() => setLoading(false)));
-    }), 200);
+    const timer = setTimeout(
+      protect(() => {
+        let params = { ...filters };
+        if (searchValue) {
+          params[searchKey] = searchValue;
+        }
+        setLoading(true);
+        requests
+          .get(restful, { params })
+          .then(
+            protect(response => {
+              const results = parseListResponse(response.data);
+              setInnerOptions(oldOpts => {
+                const selectedOpts = oldOpts.filter(opt => selectedValues.includes(getOptionValue(opt)));
+                const _values = oldOpts.map(opt => getOptionValue(opt));
+                const addOpts = results.filter(opt => !_values.includes(getOptionValue(opt)));
+                const opts = selectedOpts.concat(addOpts);
+                return opts;
+              });
+            }),
+          )
+          .finally(protect(() => setLoading(false)));
+      }),
+      200,
+    );
     return () => clearTimeout(timer);
   }, [restful, filters, searchKey, parseListResponse, searchValue, protect, disabled, selectedValues, getOptionValue]);
 
@@ -134,7 +147,7 @@ const SelectView = ({
     let _view = '无更多数据';
     if (restful) {
       if (loading) {
-        _view = <Spin size="small"/>;
+        _view = <Spin size="small" />;
       } else {
         _view = '请输入合适的关键字进行搜索';
       }
@@ -150,11 +163,13 @@ const SelectView = ({
       placeholder="可输入关键内容搜索，从下拉列表中选择"
       {...antdSelectProps}
       mode={mode}
+      disabled={disabled}
       options={innerOptions}
       fieldNames={fieldNames}
       value={innerValue}
+      filterOption={false}
       showSearch={true}
-      onSearch={(v) => setSearchValue(v)}
+      onSearch={v => setSearchValue(v)}
       onClear={() => onValueChange(null)}
       onSelect={(value, option) => onValueChange(value, option)}
     />
@@ -179,9 +194,9 @@ SelectView.propTypes = {
 
   // 默认单选，多选：multiple
   mode: PropTypes.string,
+  disabled: PropTypes.bool,
   // antd原生配置项
   antdSelectProps: PropTypes.object,
-
 };
 
 export default SelectView;
