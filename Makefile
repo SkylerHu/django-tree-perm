@@ -2,8 +2,6 @@
 .PHONY: clean clean-build clean-dist clean-pyc lint test test-all coverage release dist install help
 .DEFAULT_GOAL := help
 
-OS := $(shell uname -s)
-
 VENV_NAME?=.env
 PYTHON=${VENV_NAME}/bin/python
 
@@ -72,12 +70,6 @@ install: clean-build ## install the package to the active Python's site-packages
 
 build-static: ## build frontend and copy to django_tree_perm static directory
 	# cd frontend && rm -rf build && npm run build && cd ..
+	mkdir -p django_tree_perm/static/tree_perm
 	rsync -avc --delete --exclude="*.map" --exclude="*.LICENSE.txt" --exclude="asset-manifest.json" frontend/build/ django_tree_perm/static/tree_perm/
 	cp -f django_tree_perm/static/tree_perm/index.html django_tree_perm/templates/tree_perm/main.html
-# ifeq ($(OS), Darwin)
-# 	sed -i "" "s/\.\//\/static\/tree_perm\//g" django_tree_perm/templates/tree_perm/main.html
-# 	sed -i "" "s/<body>/<body>{% csrf_token %}/g" django_tree_perm/templates/tree_perm/main.html
-# else
-# 	sed -i "s/\.\//\/static\/tree_perm\//g" django_tree_perm/templates/tree_perm/main.html
-# 	sed -i "s/<body>/<body>{% csrf_token %}/g" django_tree_perm/templates/tree_perm/main.html
-# endif

@@ -25,3 +25,12 @@ def get_tree_paths(paths):
                 # 不存在则按顺序插入数组中
                 bisect.insort_right(results, path)
     return results
+
+
+def get_path_parent(path):
+    if not path:
+        return ""
+    info = path.split(TREE_SPLIT_NODE_FLAG)
+    if len(info) <= 1:
+        return ""
+    return TREE_SPLIT_NODE_FLAG.join(info[:-1])

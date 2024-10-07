@@ -13,9 +13,9 @@ urlpatterns = [
         include(
             [
                 path("nodes/", views.TreeNodeView.as_view()),
-                path("nodes/<int:node_id>/", views.TreeNodeEditView.as_view()),
-                path("nodes/load/", views.TreeLoadView.as_view()),
-                path("nodes/lazyload/", views.TreeLazyLoadView.as_view()),
+                path("nodes/<str:path_or_id>/", views.TreeNodeEditView.as_view()),
+                path("load/", views.TreeLoadView.as_view()),
+                path("lazyload/", views.TreeLazyLoadView.as_view()),
             ]
         ),
     ),

@@ -11,6 +11,7 @@ from django.shortcuts import get_object_or_404, render
 
 from django_tree_perm import exceptions
 from django_tree_perm.models import User, TreeNode
+from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 from django_tree_perm.controller import TreeNodeManger
 
 
@@ -27,6 +28,14 @@ class BaseView(View):
         else:
             data = request.POST
         return data
+
+    @classmethod
+    def get_object(cls, path_or_id):
+        if path_or_id.isdigit():
+            node = get_object_or_404(TreeNode, pk=path_or_id)
+        else:
+            node = get_object_or_404(TreeNode, path=path_or_id)
+        return node
 
     def dispatch(self, request, *args, **kwargs):
         try:
@@ -66,12 +75,12 @@ class TreeNodeView(BaseView):
 
 class TreeNodeEditView(BaseView):
 
-    def get(self, request, *args, node_id=None, **kwargs):
-        node = get_object_or_404(TreeNode, pk=node_id)
+    def get(self, request, *args, path_or_id=None, **kwargs):
+        node = self.get_object(path_or_id)
         return JsonResponse(node.to_json(), status=HTTPStatus.OK)
 
-    def patch(self, request, *args, node_id=None, **kwargs):
-        node = get_object_or_404(TreeNode, pk=node_id)
+    def patch(self, request, *args, path_or_id=None, **kwargs):
+        node = self.get_object(path_or_id)
 
         data = self.parese_request_body(request)
         manager = TreeNodeManger(node=node)
@@ -83,8 +92,9 @@ class TreeNodeEditView(BaseView):
         )
         return JsonResponse(manager.node.to_json(), status=HTTPStatus.CREATED)
 
-    def delete(self, request, *args, node_id=None, **kwargs):
-        node = get_object_or_404(TreeNode, pk=node_id)
+    def delete(self, request, *args, path_or_id=None, **kwargs):
+        node = self.get_object(path_or_id)
+
         data = node.to_json()
         manager = TreeNodeManger(node=node)
         manager.remove()
@@ -106,22 +116,26 @@ class TreeLazyLoadView(BaseView):
             # 若是不传递则返回根结点
             queryset = queryset.filter(depth=1)
 
-        results = [node.to_json() for node in queryset]
+        results = [node.to_json(simple=True) for node in queryset]
         return JsonResponse({"count": len(results), "results": results}, status=HTTPStatus.OK)
 
 
 class TreeLoadView(BaseView):
     def get(self, request, *args, **kwargs):
         search = request.GET.get("search", None)
+        path = request.GET.get("path", None)
+        parent_path = request.GET.get("parent_path", None)
         depth = request.GET.get("depth", None)
 
         queryset = TreeNode.objects.filter(disabled=False)
-        trace_to_root = False
+        trace_to_root = any([search, path, depth])
         if depth:
-            trace_to_root = True
             queryset = queryset.filter(depth__lte=depth)
+        if path:
+            queryset = queryset.filter(path=path)
+        if parent_path:
+            queryset = queryset.filter(path__startswith=f"{parent_path}{TREE_SPLIT_NODE_FLAG}")
         if search:
-            trace_to_root = True
             queryset = queryset.search_nodes(search)
 
         count = queryset.count()

@@ -17,10 +17,16 @@ code {
 }
 
 .cls-tree-view {
-  position: absolute;
+  position: relative;
   width: 100% !important;
   height: 100% !important;
   margin-top: 10px;
+}
+
+.cls-tree-wrapper {
+  position: absolute;
+  width: 100% !important;
+  height: 100% !important;
   overflow: auto;
   border: 2px solid #f5f7f9;
 }
@@ -28,4 +34,10 @@ code {
 .cls-tree-container {
   min-height: 600px;
   margin-bottom: 100px;
+}
+
+.cls-view-match-parent {
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 600px;
 }

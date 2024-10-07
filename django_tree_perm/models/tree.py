@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
 
 from django_tree_perm import settings
-from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
+from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_path_parent
 from .manager import TreeNodeManager, TreeNodeQuerySet
 
 
@@ -44,7 +44,7 @@ class TreeNode(BaseTimeModel):
         ]
 
     name = models.CharField(verbose_name="标识", max_length=64, db_index=True, validators=[_validator()])
-    alias = models.CharField(verbose_name="显示名称", max_length=64, default="", blank=True)
+    alias = models.CharField(verbose_name="别名", max_length=64, default="", blank=True)
     description = models.CharField(verbose_name="描述", max_length=1024, default="", blank=True)
     # 父类结点为空时，表示是树的根结点
     parent = models.ForeignKey(
@@ -55,8 +55,8 @@ class TreeNode(BaseTimeModel):
         blank=True,
         null=True,
     )
-    # is_key=True的结点不允许新增子结点
-    is_key = models.BooleanField(verbose_name="绝对叶子结点", default=False)
+    # is_key=True的结点 为 绝对叶子结点，不允许新增子结点；应用场景AppKey
+    is_key = models.BooleanField(verbose_name="作为Key", default=False)
     # 叶子结点不可以删除，仅用于叶子结点
     disabled = models.BooleanField(verbose_name="是否禁用", default=False, db_index=True)
     # 以下字段不允许直接赋值更新
@@ -79,25 +79,34 @@ class TreeNode(BaseTimeModel):
     def __str__(self):
         return f"TreeNode:{self.id} {self.path}"
 
-    def to_json(self):
+    def to_json(self, simple=False):
         data = {
             "id": self.id,
             "name": self.name,
             "alias": self.alias,
-            "description": self.description,
             "parent_id": self.parent_id,
             "is_key": self.is_key,
-            "disabled": self.disabled,
             "path": self.path,
-            "depth": self.depth,
-            "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
-            "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
         }
+        if not simple:
+            data.update(
+                {
+                    "disabled": self.disabled,
+                    "description": self.description,
+                    "depth": self.depth,
+                    "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
+                    "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
+                }
+            )
         return data
 
     @property
     def path_prefix(self):
         return f"{self.path}{TREE_SPLIT_NODE_FLAG}"
+
+    @property
+    def parent_path(self):
+        return get_path_parent(self.path)
 
     def _patch_attrs(self):
         # 初始化path

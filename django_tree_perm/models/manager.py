@@ -15,10 +15,16 @@ class TreeNodeQuerySet(models.QuerySet):
         queryset = self
         if not value:
             return queryset
+
         # 传的值是path路径
         if TREE_SPLIT_NODE_FLAG in value:
-            qs = queryset.filter(path__contains=value)
-            return qs
+            qs = queryset.filter(path=value)
+            if not qs.exists():
+                qs = queryset.filter(path__startswith=value)
+                if not qs.exists():
+                    qs = queryset.filter(path__contains=value)
+            return qs.limit_to_top_node()
+
         # 绝对叶子结点有值相等
         qs = queryset.filter(is_key=True, name=value)
         if qs.exists():
@@ -27,8 +33,21 @@ class TreeNodeQuerySet(models.QuerySet):
         qs = queryset.filter(is_key=True, name__contains=value)
         if qs.exists():
             return qs
+
         # 根据name模糊搜索
         qs = queryset.filter(name__contains=value)
+        return qs.limit_to_top_node()
+
+    def limit_to_top_node(self):
+        """若是按照路径查找，尽可能返回更少的结点。
+        优先返回树结构上层的结点
+        """
+        qs = self
+        first = qs.order_by("depth").first()
+        if first:
+            qs = qs.filter(depth__lte=first.depth)
+        else:
+            qs = qs.none()
         return qs
 
     def search_keys(self, value):
