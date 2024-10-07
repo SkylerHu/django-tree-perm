@@ -6,6 +6,7 @@ from django.db import transaction, models
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 
+from django_tree_perm import utils
 from django_tree_perm import exceptions
 from django_tree_perm.models import TreeNode, NodeRole
 
@@ -86,10 +87,10 @@ class TreeNodeManger(object):
         return rows
 
     @transaction.atomic
-    def remove(self, clear_chidren=False, clear_roles=False):
+    def remove(self, clear_chidren=False, clear_roles=True):
         node = self.node
         if node.disabled:
-            return 0
+            raise exceptions.ParamsValidateException("The node has been disabled. Repeated operation is not allowed.")
         if node.is_key:
             node.parent = None
             node.disabled = True
@@ -162,6 +163,40 @@ class TreeNodeManger(object):
         elif required:
             raise exceptions.ParamsValidateException("Parent node not found, and cannot be null.")
         return parent
+
+    @classmethod
+    def to_json_tree(cls, queryset):
+        """转换成树形结构的数据
+        尽量不要渲染整棵树，处理速度会很慢；
+        可以在调用之前多使用filter函数
+        """
+        paths = utils.get_tree_paths(list(queryset.values_list("path", flat=True)))
+        queryset = TreeNode.objects.all().filter(path__in=paths)
+
+        tree = []
+        # 以parent_id为key, value是数组--存放直接子结点
+        parent_child_nodes = {}
+        for node in queryset:
+            if node.parent_id:
+                parent_child_nodes.setdefault(node.parent_id, [])
+                parent_child_nodes[node.parent_id].append(node.to_json())
+            else:
+                tree.append(node.to_json())
+
+        # 组装树形结构
+        leafs = tree
+        while True:
+            if not leafs:
+                break
+            new_leafs = []
+            for parent in leafs:
+                children = parent_child_nodes.get(parent["id"], [])
+                if children:
+                    parent["children"] = children
+                    new_leafs.extend(children)
+            leafs = new_leafs
+
+        return tree
 
 
 class PermManager(object):

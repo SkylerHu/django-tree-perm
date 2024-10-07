@@ -1,7 +1,9 @@
+
+import { notification } from 'antd';
 import axios from 'axios';
 
 export function formatRequestError (error) {
-  let err_msg = error.message;
+  let errMsg = error.message;
   if (error.response) {
     const status = error.response.status;
     let msg = '';
@@ -11,7 +13,7 @@ export function formatRequestError (error) {
         break;
       }
       case 403: {
-        msg = '未授权禁止操作';
+        msg = '未授权/禁止操作';
         break;
       }
       default: {
@@ -23,11 +25,11 @@ export function formatRequestError (error) {
       }
     }
     if (error.response.status) {
-      err_msg = `HttpError(${status}): ${msg}`;
+      errMsg = `HttpError(${status}): ${msg}`;
     }
 
   }
-  return { err_msg };
+  return { errMsg };
 }
 
 
@@ -68,6 +70,16 @@ instance.interceptors.request.use((config) => {
   config.headers = headers;
 
   return config;
+});
+instance.interceptors.response.use((response) => {
+  return response;
+}, (error) => {
+  const { errMsg } = formatRequestError(error);
+  notification.error({
+    message: '操作失败，请重试',
+    description: errMsg,
+  });
+  return Promise.reject(error);
 });
 
 

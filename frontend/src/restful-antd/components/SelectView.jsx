@@ -129,7 +129,9 @@ const SelectView = ({
               const results = parseListResponse(response.data);
               setInnerOptions(oldOpts => {
                 const selectedOpts = oldOpts.filter(opt => selectedValues.includes(getOptionValue(opt)));
-                const _values = oldOpts.map(opt => getOptionValue(opt));
+                // 之所以再找一次_values，是避免选中的value没有初始化option
+                const _values = selectedOpts.map(opt => getOptionValue(opt));
+                // 刷选出需要增加的options
                 const addOpts = results.filter(opt => !_values.includes(getOptionValue(opt)));
                 const opts = selectedOpts.concat(addOpts);
                 return opts;

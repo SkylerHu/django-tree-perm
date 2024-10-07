@@ -1,17 +1,24 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import PropTypes from 'prop-types';
-import { PlusOutlined, SettingOutlined, ReloadOutlined, FormOutlined, DeleteOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import {
+  PlusOutlined,
+  SettingOutlined,
+  ReloadOutlined,
+  FormOutlined,
+  DeleteOutlined,
+  MenuUnfoldOutlined,
+} from '@ant-design/icons';
 import { message, Tree, Input, Row, Col, Button, Modal, Form, Checkbox, Space, Dropdown, Tooltip } from 'antd';
 
 import * as Enum from 'js-enumerate';
 
 import SelectView from './restful-antd/components/SelectView';
 import { useProtect } from './restful-antd/hooks';
-import requests, { formatRequestError } from './restful-antd/requests';
+import requests from './restful-antd/requests';
 import { TreeApi } from './constants';
 
 const NodeMenu = new Enum([
-  { key: 'REFRESH', value: 'refresh', label: '刷新子结点' },
+  { key: 'REFRESH', value: 'refresh', label: '加载子结点' },
   { key: 'ADD', value: 'add', label: '新增子结点' },
   { key: 'EDIT', value: 'edit', label: '修改信息' },
   { key: 'DELETE', value: 'delete', label: '删除结点', danger: true },
@@ -26,21 +33,43 @@ const NODE_MENU_ICON = {
 
 const TREE_KEY_FIELD = 'id';
 
-const findNodeByPath = (treeData, path) => {
-  if (!path) {
+const findNodeByPath = (treeData, path, node_id) => {
+  if (!path && !node_id) {
     return null;
   }
   // 递归查找父类结点
   for (let i = 0; i < treeData.length; i++) {
     const node = treeData[i];
-    if (node.path === path) {
+    if (node_id && node.id === node_id) {
       return node;
     }
-    if (node.path && path.startsWith(node.path) && node.children) {
-      return findNodeByPath(node.children, path);
+    if (path && node.path === path) {
+      return node;
+    }
+    if (node.children) {
+      if (node_id) {
+        return findNodeByPath(node.children, path, node_id);
+      } else if (path && node.path && path.startsWith(node.path)) {
+        return findNodeByPath(node.children, path);
+      }
     }
   }
   return null;
+};
+
+// 更新是否是叶子结点
+const refreshNodeLeaf = (treeData, isLoadAll = false) => {
+  for (let i = 0; i < treeData.length; i++) {
+    const node = treeData[i];
+    if (node.is_key) {
+      node.isLeaf = true;
+    } else if (isLoadAll && !node.children?.length) {
+      node.isLeaf = true;
+    }
+    if (node.children) {
+      refreshNodeLeaf(node.children, isLoadAll);
+    }
+  }
 };
 
 /**
@@ -52,11 +81,7 @@ const insertChildren = (treeData, nodes, parent_path) => {
     return treeData;
   }
   // 更新结点isLeaf属性
-  nodes.forEach(node => {
-    if (node.is_key) {
-      node.isLeaf = node.is_key;
-    }
-  });
+  refreshNodeLeaf(nodes);
   // 若是刷新根结点
   if (!parent_path) {
     return nodes;
@@ -91,7 +116,7 @@ const nodeInsertChild = (treeData, parent_path, node) => {
   }
   if (parentNode.children) {
     // 添加在最前面
-    const keys = parentNode.children.map(node => node[TREE_KEY_FIELD]);
+    const keys = parentNode.children.map(item => item[TREE_KEY_FIELD]);
     if (!keys.includes(node[TREE_KEY_FIELD])) {
       parentNode.children.unshift(node);
     }
@@ -101,18 +126,42 @@ const nodeInsertChild = (treeData, parent_path, node) => {
   return treeData;
 };
 
+const nodeRemoveChild = (treeData, parent_id, node) => {
+  if (!parent_id) {
+    return [];
+  }
+  const parentNode = findNodeByPath(treeData, null, parent_id);
+  if (!parentNode || !parentNode.children) {
+    return treeData;
+  }
+  parentNode.children = parentNode.children.filter(item => item[TREE_KEY_FIELD] !== node[TREE_KEY_FIELD]);
+  return treeData;
+};
+
+const getNodeLabel = node => {
+  let label = node.alias ? `${node.name} (${node.alias})` : node.name;
+  return label;
+};
+
 // 获取所有key
-const genAllKeys = (treeData) => {
-  let keys = treeData.map(node => node[TREE_KEY_FIELD]);
+const genAllKeys = treeData => {
+  let keys = [];
   for (let i = 0; i < treeData.length; i++) {
     const node = treeData[i];
-    if (node.children) {
+    if (node.depth < 2) {
+      keys.push(node[TREE_KEY_FIELD]);
+    }
+    if (node.children?.length > 0) {
+      keys.push(node[TREE_KEY_FIELD]);
       keys = keys.concat(genAllKeys(node.children));
     }
   }
   return keys;
 };
 
+/**
+ * 树展示组件
+ */
 const TreeView = () => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
@@ -126,8 +175,11 @@ const TreeView = () => {
   const [treeData, setTreeData] = useState([]);
   // 展开的结点
   const [expandedKeys, setExpandedKeys] = useState([]);
+  const [isExpanded, setExpanded] = useState(false);
   // 鼠标移动到的结点
   const [hoverNode, setHoverNode] = useState();
+  // 搜索值
+  const [searchValue, setSearchValue] = useState();
 
   // 根据结点刷新其子结点的数据
   const refreshByNode = useCallback(
@@ -161,18 +213,41 @@ const TreeView = () => {
     [protect],
   );
 
+  const fetchAllNode = useCallback(
+    (params = null) => {
+      setLoading(true);
+      const isLoadAll = params ? false : true;
+      requests
+        .get(TreeApi.LOAD_ALL, { params })
+        .then(
+          protect(resp => {
+            const nodes = resp.data.results;
+            refreshNodeLeaf(nodes, isLoadAll);
+            setTreeData(nodes);
+            setExpandedKeys(genAllKeys(nodes));
+          }),
+        )
+        .finally(protect(() => setLoading(false)));
+    },
+    [protect],
+  );
+
   useEffect(() => {
     // refreshByNode();
-    requests.get(TreeApi.LOAD_ALL, { params: { depth: 2 } }).then(
-      protect(resp => {
-        const nodes = resp.data.results;
-        setTreeData(nodes);
-        setExpandedKeys(nodes.map(node => node[TREE_KEY_FIELD]));
-      }),
-    );
+    fetchAllNode({ depth: 2 });
     // 仅需在初始化时加载一次即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    setTimeout(() => {
+      if (!searchValue) {
+        fetchAllNode({ depth: 2 });
+      } else {
+        fetchAllNode({ search: searchValue });
+      }
+    }, 200);
+  }, [searchValue, fetchAllNode]);
 
   // 重置表单
   const resetFormData = useCallback(
@@ -189,6 +264,20 @@ const TreeView = () => {
     },
     [formRef],
   );
+
+  const nodeUseMenus = useCallback((node) => {
+    const menus = NodeMenu.options.filter(menu => {
+      if (node.is_key) {
+        if ([NodeMenu.EDIT, NodeMenu.DELETE].includes(menu.value)) {
+          return true;
+        }
+      } else {
+        return true;
+      }
+      return false;
+    }).map(item => ({ ...item, key: item.value, icon: NODE_MENU_ICON[item.value] }));
+    return menus;
+  }, []);
 
   // 弹窗消失时应当处理如下逻辑
   const onModalClose = useCallback(() => {
@@ -209,10 +298,16 @@ const TreeView = () => {
               protect(resp => {
                 message.success('修改成功');
                 onModalClose();
-                setTreeData(oldData => {
-                  const data = refreshNodeInfo(oldData, resp.data);
-                  return [...data];
-                });
+                const node = resp.data;
+                if (editNode.parent_id === node.parent_id) {
+                  setTreeData(oldData => {
+                    const data = refreshNodeInfo(oldData, node);
+                    return [...data];
+                  });
+                } else {
+                  // 变更了父类结点
+                  fetchAllNode({ search: node.path });
+                }
               }),
             )
             .finally(protect(() => setLoading(false)));
@@ -223,11 +318,11 @@ const TreeView = () => {
               protect(resp => {
                 message.success('操作成功');
                 onModalClose();
-                if (editNode) {
+                const node = resp.data;
+                node.isLeaf = true;
+                if (editType === NodeMenu.ADD && editNode) {
                   if (expandedKeys.includes(editNode[TREE_KEY_FIELD])) {
                     // 结点已经展开，直接插入数据
-                    const node = resp.data;
-                    node.isLeaf = true;
                     setTreeData(oldData => {
                       const data = nodeInsertChild(oldData, editNode.path, node);
                       return [...data];
@@ -238,10 +333,6 @@ const TreeView = () => {
                   }
                 }
               }),
-              protect(error => {
-                const { err_msg } = formatRequestError(error);
-                message.error(`操作失败，请重试. ${err_msg}`);
-              }),
             )
             .finally(protect(() => setLoading(false)));
         }
@@ -250,7 +341,7 @@ const TreeView = () => {
         message.error('请正确填写表单');
       }),
     );
-  }, [formRef, editNode, editType, protect, onModalClose, refreshByNode, expandedKeys]);
+  }, [protect, formRef, editNode, editType, expandedKeys, onModalClose, refreshByNode, fetchAllNode]);
 
   return (
     <div style={{ width: '100%', height: '100%', padding: 10 }}>
@@ -259,7 +350,7 @@ const TreeView = () => {
           <Input.Search
             styles={{ width: '100%' }}
             placeholder="输入关键字进行搜索"
-            // onSearch={value => {}}
+            onSearch={value => setSearchValue(value)}
             enterButton
           />
         </Col>
@@ -270,24 +361,23 @@ const TreeView = () => {
                 type="primary"
                 icon={<ReloadOutlined />}
                 onClick={() => {
-                  requests.get(TreeApi.LOAD_ALL).then(
-                    protect(resp => {
-                      const nodes = resp.data.results;
-                      setTreeData(nodes);
-                      setExpandedKeys(nodes.map(node => node[TREE_KEY_FIELD]));
-                    }),
-                  );
+                  fetchAllNode();
                 }}
               />
             </Tooltip>
-            <Tooltip title="展开/折叠所有节点">
-              <Button type="primary" icon={<MenuUnfoldOutlined />} onClick={() => {
-                if (expandedKeys.length > 0) {
-                  setExpandedKeys([]);
-                } else {
-                  setExpandedKeys(genAllKeys(treeData));
-                }
-              }} />
+            <Tooltip title="展开/收起已加载的节点">
+              <Button
+                type="primary"
+                icon={<MenuUnfoldOutlined />}
+                onClick={() => {
+                  if (isExpanded) {
+                    setExpandedKeys([]);
+                  } else {
+                    setExpandedKeys(genAllKeys(treeData));
+                  }
+                  setExpanded(v => !v);
+                }}
+              />
             </Tooltip>
             <Tooltip title="新增根结点">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditModalVisiable(true)} />
@@ -314,10 +404,10 @@ const TreeView = () => {
               })
             }
           >
-            <div>{node.alias ? `${node.name} (${node.alias})` : node.name}</div>
+            <div style={ node.is_key && !searchValue ? { color: '#fa8c16', fontWeight: 'bold' } : undefined }>{getNodeLabel(node)}</div>
             <Dropdown
               menu={{
-                items: NodeMenu.options.map(item => ({ ...item, key: item.value, icon: NODE_MENU_ICON[item.value] })),
+                items: nodeUseMenus(node),
                 onClick: menu => {
                   setEditType(menu.key);
                   switch (menu.key) {
@@ -338,6 +428,27 @@ const TreeView = () => {
                       break;
                     }
                     case NodeMenu.DELETE: {
+                      Modal.warning({
+                        title: '确认删除？',
+                        content: (
+                          <div>
+                            <div>操作删除结点：{getNodeLabel(node)}</div>
+                            <div>结点路径: {node.path}</div>
+                          </div>
+                        ),
+                        destroyOnClose: true,
+                        onOk: () => {
+                          requests.delete(TreeApi.nodeDetail(node.id)).then(
+                            protect(() => {
+                              message.success(`删除 ${node.path} 成功`);
+                              setTreeData(oldData => {
+                                const data = nodeRemoveChild(oldData, node.parent_id, node);
+                                return [...data];
+                              });
+                            }),
+                          );
+                        },
+                      });
                       break;
                     }
                     default:
@@ -346,10 +457,13 @@ const TreeView = () => {
                 },
               }}
             >
-              <SettingOutlined style={hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }}/>
+              <span style={hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }}>
+                <SettingOutlined style={{ padding: '0 5px' }}/>
+              </span>
             </Dropdown>
           </Space>
         )}
+        filterTreeNode={ searchValue ? (node) => searchValue && node.name.indexOf(searchValue) > -1 : undefined}
         expandedKeys={expandedKeys}
         onExpand={expandedKeys => setExpandedKeys(expandedKeys)}
         loadData={node =>

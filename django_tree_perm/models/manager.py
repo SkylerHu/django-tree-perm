@@ -61,38 +61,3 @@ class TreeNodeQuerySet(models.QuerySet):
             query = query | models.Q(path__startswith=f"{path}{TREE_SPLIT_NODE_FLAG}")
         queryset = queryset.filter(query)
         return queryset
-
-    def to_json_tree(self):
-        """转换成树形结构的数据
-        尽量不要渲染整棵树，处理速度会很慢；
-        可以在调用之前多使用filter函数
-        """
-        queryset = self
-        # if search_up:
-        #     paths = utils.get_tree_paths(list(self.values_list("path", flat=True)))
-        #     queryset = self.all().filter(path__in=paths)
-
-        tree = []
-        # 以parent_id为key, value是数组--存放直接子结点
-        parent_child_nodes = {}
-        for node in queryset:
-            if node.parent_id:
-                parent_child_nodes.setdefault(node.parent_id, [])
-                parent_child_nodes[node.parent_id].append(node.to_json())
-            else:
-                tree.append(node.to_json())
-
-        # 组装树形结构
-        leafs = tree
-        while True:
-            if not leafs:
-                break
-            new_leafs = []
-            for parent in leafs:
-                children = parent_child_nodes.get(parent["id"], [])
-                if children:
-                    parent["children"] = children
-                    new_leafs.extend(children)
-            leafs = new_leafs
-
-        return tree

@@ -28,6 +28,12 @@ class BaseView(View):
             data = request.POST
         return data
 
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            return super().dispatch(request, *args, **kwargs)
+        except (ValidationError, exceptions.ParamsValidateException) as e:
+            return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+
 
 class TreeNodeView(BaseView):
 
@@ -53,11 +59,8 @@ class TreeNodeView(BaseView):
         return JsonResponse({"count": len(results), "results": results}, status=HTTPStatus.OK)
 
     def post(self, request, *args, **kwargs):
-        try:
-            data = self.parese_request_body(request)
-            manager = TreeNodeManger.add_node(**data)
-        except (ValidationError, exceptions.ParamsValidateException) as e:
-            return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+        data = self.parese_request_body(request)
+        manager = TreeNodeManger.add_node(**data)
         return JsonResponse(manager.node.to_json(), status=HTTPStatus.CREATED)
 
 
@@ -70,22 +73,22 @@ class TreeNodeEditView(BaseView):
     def patch(self, request, *args, node_id=None, **kwargs):
         node = get_object_or_404(TreeNode, pk=node_id)
 
-        try:
-            data = self.parese_request_body(request)
-            print("data===>", data)
-            manager = TreeNodeManger(node=node)
-            manager.update_attrs(
-                name=data.get("name"),
-                alias=data.get("alias"),
-                description=data.get("description"),
-                parent_id=data.get("parent_id"),
-            )
-        except (ValidationError, exceptions.ParamsValidateException) as e:
-            return JsonResponse({"error": str(e)}, status=HTTPStatus.BAD_REQUEST)
+        data = self.parese_request_body(request)
+        manager = TreeNodeManger(node=node)
+        manager.update_attrs(
+            name=data.get("name"),
+            alias=data.get("alias"),
+            description=data.get("description"),
+            parent_id=data.get("parent_id"),
+        )
         return JsonResponse(manager.node.to_json(), status=HTTPStatus.CREATED)
 
-    def delete(self, request, *args, **kwargs):
-        pass
+    def delete(self, request, *args, node_id=None, **kwargs):
+        node = get_object_or_404(TreeNode, pk=node_id)
+        data = node.to_json()
+        manager = TreeNodeManger(node=node)
+        manager.remove()
+        return JsonResponse(data, status=HTTPStatus.NO_CONTENT)
 
 
 class TreeLazyLoadView(BaseView):
@@ -117,6 +120,8 @@ class TreeLoadView(BaseView):
             queryset = queryset.filter(depth__lte=depth)
         if search:
             queryset = queryset.search_nodes(search)
-        data = queryset.to_json_tree()
 
-        return JsonResponse({"results": data}, status=HTTPStatus.OK)
+        count = queryset.count()
+        data = TreeNodeManger.to_json_tree(queryset)
+
+        return JsonResponse({"count": count, "results": data}, status=HTTPStatus.OK)
