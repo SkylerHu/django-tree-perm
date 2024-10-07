@@ -265,17 +265,33 @@ const TreeView = () => {
     [formRef],
   );
 
-  const nodeUseMenus = useCallback((node) => {
-    const menus = NodeMenu.options.filter(menu => {
-      if (node.is_key) {
-        if ([NodeMenu.EDIT, NodeMenu.DELETE].includes(menu.value)) {
+  // 结点显示的样式
+  const getNodeStyle = useCallback((node) => {
+    let style = {};
+    if (node.is_key) {
+      style.fontWeight = 'bold';
+      style.color = '#fa8c16';
+      if (searchValue && node.name.indexOf(searchValue) > -1) {
+        style.color = '#fa541c';
+      }
+    }
+    return style;
+  }, [searchValue]);
+
+  // 结点可以操作的菜单列表
+  const nodeUseMenus = useCallback(node => {
+    const menus = NodeMenu.options
+      .filter(menu => {
+        if (node.is_key) {
+          if ([NodeMenu.EDIT, NodeMenu.DELETE].includes(menu.value)) {
+            return true;
+          }
+        } else {
           return true;
         }
-      } else {
-        return true;
-      }
-      return false;
-    }).map(item => ({ ...item, key: item.value, icon: NODE_MENU_ICON[item.value] }));
+        return false;
+      })
+      .map(item => ({ ...item, key: item.value, icon: NODE_MENU_ICON[item.value] }));
     return menus;
   }, []);
 
@@ -346,7 +362,7 @@ const TreeView = () => {
   return (
     <div style={{ width: '100%', height: '100%', padding: 10 }}>
       <Row gutter={10}>
-        <Col span={20}>
+        <Col flex="auto">
           <Input.Search
             styles={{ width: '100%' }}
             placeholder="输入关键字进行搜索"
@@ -354,7 +370,7 @@ const TreeView = () => {
             enterButton
           />
         </Col>
-        <Col span={4}>
+        <Col flex="120px">
           <Space>
             <Tooltip title="加载全部结点">
               <Button
@@ -385,93 +401,100 @@ const TreeView = () => {
           </Space>
         </Col>
       </Row>
-      <div style={{ height: 10 }} />
-      <Tree
-        treeData={treeData}
-        fieldNames={{
-          title: 'name',
-          key: TREE_KEY_FIELD,
-        }}
-        titleRender={node => (
-          <Space
-            onMouseEnter={() => setHoverNode(node)}
-            onMouseLeave={() =>
-              setHoverNode(oldNode => {
-                if (oldNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD]) {
-                  return null;
+      <div className='cls-tree-view'>
+        <div className='cls-tree-container'>
+          <Tree
+            treeData={treeData}
+            fieldNames={{
+              title: 'name',
+              key: TREE_KEY_FIELD,
+            }}
+            titleRender={node => (
+              <Space
+                onMouseEnter={() => setHoverNode(node)}
+                onMouseLeave={() =>
+                  setHoverNode(oldNode => {
+                    if (oldNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD]) {
+                      return null;
+                    }
+                    return oldNode;
+                  })
                 }
-                return oldNode;
+              >
+                <div style={getNodeStyle(node)}>
+                  {getNodeLabel(node)}
+                </div>
+                <Dropdown
+                  menu={{
+                    items: nodeUseMenus(node),
+                    onClick: menu => {
+                      setEditType(menu.key);
+                      switch (menu.key) {
+                        case NodeMenu.REFRESH: {
+                          refreshByNode(node);
+                          break;
+                        }
+                        case NodeMenu.EDIT: {
+                          setEditNode(node);
+                          setEditModalVisiable(true);
+                          resetFormData(node);
+                          break;
+                        }
+                        case NodeMenu.ADD: {
+                          setEditNode(node);
+                          setEditModalVisiable(true);
+                          resetFormData({ parent_id: node.id });
+                          break;
+                        }
+                        case NodeMenu.DELETE: {
+                          Modal.warning({
+                            title: '确认删除？',
+                            content: (
+                              <div>
+                                <div>操作删除结点：{getNodeLabel(node)}</div>
+                                <div>结点路径: {node.path}</div>
+                              </div>
+                            ),
+                            destroyOnClose: true,
+                            onOk: () => {
+                              requests.delete(TreeApi.nodeDetail(node.id)).then(
+                                protect(() => {
+                                  message.success(`删除 ${node.path} 成功`);
+                                  setTreeData(oldData => {
+                                    const data = nodeRemoveChild(oldData, node.parent_id, node);
+                                    return [...data];
+                                  });
+                                }),
+                              );
+                            },
+                          });
+                          break;
+                        }
+                        default:
+                          break;
+                      }
+                    },
+                  }}
+                >
+                  <span
+                    style={hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }}
+                  >
+                    <SettingOutlined style={{ padding: '0 5px' }} />
+                  </span>
+                </Dropdown>
+              </Space>
+            )}
+            filterTreeNode={searchValue ? node => searchValue && node.name.indexOf(searchValue) > -1 : undefined}
+            expandedKeys={expandedKeys}
+            onExpand={expandedKeys => setExpandedKeys(expandedKeys)}
+            loadData={node =>
+              new Promise(resolve => {
+                refreshByNode(node, resolve);
               })
             }
-          >
-            <div style={ node.is_key && !searchValue ? { color: '#fa8c16', fontWeight: 'bold' } : undefined }>{getNodeLabel(node)}</div>
-            <Dropdown
-              menu={{
-                items: nodeUseMenus(node),
-                onClick: menu => {
-                  setEditType(menu.key);
-                  switch (menu.key) {
-                    case NodeMenu.REFRESH: {
-                      refreshByNode(node);
-                      break;
-                    }
-                    case NodeMenu.EDIT: {
-                      setEditNode(node);
-                      setEditModalVisiable(true);
-                      resetFormData(node);
-                      break;
-                    }
-                    case NodeMenu.ADD: {
-                      setEditNode(node);
-                      setEditModalVisiable(true);
-                      resetFormData({ parent_id: node.id });
-                      break;
-                    }
-                    case NodeMenu.DELETE: {
-                      Modal.warning({
-                        title: '确认删除？',
-                        content: (
-                          <div>
-                            <div>操作删除结点：{getNodeLabel(node)}</div>
-                            <div>结点路径: {node.path}</div>
-                          </div>
-                        ),
-                        destroyOnClose: true,
-                        onOk: () => {
-                          requests.delete(TreeApi.nodeDetail(node.id)).then(
-                            protect(() => {
-                              message.success(`删除 ${node.path} 成功`);
-                              setTreeData(oldData => {
-                                const data = nodeRemoveChild(oldData, node.parent_id, node);
-                                return [...data];
-                              });
-                            }),
-                          );
-                        },
-                      });
-                      break;
-                    }
-                    default:
-                      break;
-                  }
-                },
-              }}
-            >
-              <span style={hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }}>
-                <SettingOutlined style={{ padding: '0 5px' }}/>
-              </span>
-            </Dropdown>
-          </Space>
-        )}
-        filterTreeNode={ searchValue ? (node) => searchValue && node.name.indexOf(searchValue) > -1 : undefined}
-        expandedKeys={expandedKeys}
-        onExpand={expandedKeys => setExpandedKeys(expandedKeys)}
-        loadData={node =>
-          new Promise(resolve => {
-            refreshByNode(node, resolve);
-          })
-        }
-      />
+          />
+        </div>
+      </div>
       <Modal
         title={NodeMenu.has(editType) ? NodeMenu.getLabel(editType) : '新增结点'}
         width="50%"

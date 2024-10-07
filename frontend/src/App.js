@@ -5,8 +5,8 @@ import TreeView from './TreeView';
 
 function App() {
   return (
-    <Row>
-      <Col span={8}>
+    <Row style={{ width: '100%', height: '100%' }}>
+      <Col span={6}>
         <TreeView />
       </Col>
     </Row>

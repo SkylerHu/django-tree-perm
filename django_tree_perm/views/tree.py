@@ -116,12 +116,15 @@ class TreeLoadView(BaseView):
         depth = request.GET.get("depth", None)
 
         queryset = TreeNode.objects.filter(disabled=False)
+        trace_to_root = False
         if depth:
+            trace_to_root = True
             queryset = queryset.filter(depth__lte=depth)
         if search:
+            trace_to_root = True
             queryset = queryset.search_nodes(search)
 
         count = queryset.count()
-        data = TreeNodeManger.to_json_tree(queryset)
+        data = TreeNodeManger.to_json_tree(queryset, trace_to_root=trace_to_root)
 
         return JsonResponse({"count": count, "results": data}, status=HTTPStatus.OK)

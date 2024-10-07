@@ -165,13 +165,14 @@ class TreeNodeManger(object):
         return parent
 
     @classmethod
-    def to_json_tree(cls, queryset):
+    def to_json_tree(cls, queryset, trace_to_root=True):
         """转换成树形结构的数据
         尽量不要渲染整棵树，处理速度会很慢；
         可以在调用之前多使用filter函数
         """
-        paths = utils.get_tree_paths(list(queryset.values_list("path", flat=True)))
-        queryset = TreeNode.objects.all().filter(path__in=paths)
+        if trace_to_root:
+            paths = utils.get_tree_paths(list(queryset.values_list("path", flat=True)))
+            queryset = TreeNode.objects.all().filter(path__in=paths)
 
         tree = []
         # 以parent_id为key, value是数组--存放直接子结点

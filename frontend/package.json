@@ -22,12 +22,22 @@
     "@testing-library/user-event": "^13.5.0",
     "eslint": "^7.1.0",
     "eslint-plugin-react": "^7.37.1",
-    "eslint-plugin-react-hooks": "^4.6.2"
+    "eslint-plugin-react-hooks": "^4.6.2",
+    "stylelint": "^14.16.1",
+    "stylelint-config-prettier": "^9.0.5",
+    "stylelint-config-rational-order": "^0.1.2",
+    "stylelint-config-standard": "^28.0.0",
+    "stylelint-declaration-block-no-ignored-properties": "^2.8.0",
+    "stylelint-order": "^6.0.4"
   },
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
+    "lint": "eslint . --ext '.js,.jsx,.ts,.tsx'",
+    "lint-fix": "npm run lint --fix",
+    "lint:style": "stylelint 'src/*.{less,css,scss,sass}'",
+    "lint-fix:style": "npm run lint:style -- --fix",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {
