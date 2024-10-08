@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Row, Col } from 'antd';
 
 import queryString from 'query-string';
@@ -7,7 +7,10 @@ import TreeView from './TreeView';
 import NodeView from './NodeView';
 
 function App() {
+
   const [path, setPath] = useState(queryString.parse(window.location.search)?.path);
+
+  const nodeRef = useRef();
 
   return (
     <Row style={{ height: '100%', padding: 10 }} gutter={20}>
@@ -15,7 +18,11 @@ function App() {
         <TreeView
           defaultValue={path}
           onChange={({ path: value }) => {
-            setPath(value);
+            if (path === value) {
+              nodeRef.current?.fetchNodeDetail(value);
+            } else {
+              setPath(value);
+            }
             if (value) {
               const location = window.location;
               const targetHref = `${location.pathname}${location.hash}?path=${value}`;
@@ -27,7 +34,7 @@ function App() {
         />
       </Col>
       <Col span={18}>
-        <NodeView path={path}/>
+        <NodeView ref={nodeRef} path={path}/>
       </Col>
     </Row>
   );

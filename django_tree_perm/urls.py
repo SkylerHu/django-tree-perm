@@ -13,9 +13,13 @@ urlpatterns = [
         include(
             [
                 path("nodes/", views.TreeNodeView.as_view()),
-                path("nodes/<str:path_or_id>/", views.TreeNodeEditView.as_view()),
+                path("nodes/<str:pk>/", views.TreeNodeEditView.as_view()),
                 path("load/", views.TreeLoadView.as_view()),
                 path("lazyload/", views.TreeLazyLoadView.as_view()),
+                path("permroles/", views.PermRoleView.as_view()),
+                path("permroles/<str:pk>/", views.PermRoleEditView.as_view()),
+                path("users/", views.UserListView.as_view()),
+                path("users/<str:pk>/", views.UserDetailView.as_view()),
             ]
         ),
     ),

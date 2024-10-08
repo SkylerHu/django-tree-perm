@@ -15,7 +15,7 @@ import * as Enum from 'js-enumerate';
 import SelectView from './restful-antd/components/SelectView';
 import { useProtect } from './restful-antd/hooks';
 import requests from './restful-antd/requests';
-import { TreeApi, getPathParent } from './tools';
+import { TreeApi, getPathParent, COMMON_FORM_COL_PROPS } from './tools';
 
 const NodeMenu = new Enum([
   { key: 'REFRESH', value: 'refresh', label: '加载子结点' },
@@ -334,6 +334,9 @@ const TreeView = ({ defaultValue, onChange }) => {
                 message.success('修改成功');
                 onModalClose();
                 const node = resp.data;
+                // 通知信息变更
+                onTreeNodeSelect(node[TREE_KEY_FIELD], node);
+                // 处理其他
                 if (editNode.parent_id === node.parent_id) {
                   setTreeData(oldData => {
                     const data = refreshNodeInfo(oldData, node);
@@ -376,11 +379,11 @@ const TreeView = ({ defaultValue, onChange }) => {
         message.error('请正确填写表单');
       }),
     );
-  }, [protect, formRef, editNode, editType, expandedKeys, onModalClose, refreshByNode, fetchAllNode]);
+  }, [protect, formRef, editNode, editType, expandedKeys, onModalClose, refreshByNode, fetchAllNode, onTreeNodeSelect]);
 
   return (
     <div style={{ width: '100%', height: '100%' }}>
-      <Row gutter={10}>
+      <Row gutter={10} wrap={false}>
         <Col flex="auto">
           <Input.Search
             styles={{ width: '100%' }}
@@ -541,7 +544,7 @@ const TreeView = ({ defaultValue, onChange }) => {
         onOk={() => onModealConfirm()}
         onCancel={() => onModalClose()}
       >
-        <Form form={formRef} labelCol={{ flex: '120px' }} wrapperCol={{ xs: { span: 24 }, sm: { span: 18 } }}>
+        <Form form={formRef} {...COMMON_FORM_COL_PROPS}>
           <Form.Item
             name="name"
             label="标识"

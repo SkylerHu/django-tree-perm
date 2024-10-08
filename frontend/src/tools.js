@@ -7,6 +7,11 @@ export const TreeApi = {
   LOAD_ALL: 'tree/load/',
 };
 
+export const COMMON_FORM_COL_PROPS = {
+  labelCol: { flex: '120px' },
+  wrapperCol: { xs: { span: 24 }, sm: { span: 18 } },
+};
+
 export const getPathParent = (path) => {
   if (!path) {
     return '';

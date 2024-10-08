@@ -41,3 +41,10 @@ code {
   height: 100% !important;
   min-height: 600px;
 }
+
+.cls-common-title {
+  color: #1f1f1f;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.5;
+}

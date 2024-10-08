@@ -9,6 +9,7 @@ from django.core.validators import RegexValidator
 from django_tree_perm import settings
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_path_parent
 from .manager import TreeNodeManager, TreeNodeQuerySet
+from .utils import user_to_json
 
 
 User = get_user_model()
@@ -148,10 +149,27 @@ class PermRole(BaseTimeModel):
     name = models.CharField(
         verbose_name="唯一标识", max_length=64, db_index=True, unique=True, validators=[_validator()]
     )
-    alias = models.CharField(verbose_name="显示名称", max_length=128, default="")
+    alias = models.CharField(verbose_name="显示名称", max_length=64, default="")
     description = models.CharField(verbose_name="描述", max_length=1024, default="")
     # 赋予该角色后，可以管理当前结点上的人员角色关系
-    can_manage = models.BooleanField(verbose_name="是否管理员", default=False)
+    can_manage = models.BooleanField(verbose_name="允许管理结点", default=False)
+
+    def to_json(self, simple=False):
+        data = {
+            "id": self.id,
+            "name": self.name,
+            "alias": self.alias,
+            "can_manage": self.can_manage,
+        }
+        if not simple:
+            data.update(
+                {
+                    "description": self.description,
+                    "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
+                    "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
+                }
+            )
+        return data
 
 
 class NodeRole(models.Model):
@@ -165,3 +183,12 @@ class NodeRole(models.Model):
     role = models.ForeignKey(PermRole, on_delete=models.CASCADE, related_name="noderole_set")
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="noderole_set")
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
+
+    def to_json(self):
+        data = {
+            "id": self.id,
+            "role": self.role.to_json(simple=True),
+            "user": user_to_json(self.user),
+            "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
+        }
+        return data
