@@ -180,9 +180,9 @@ class TreeNodeManger(object):
         for node in queryset:
             if node.parent_id:
                 parent_child_nodes.setdefault(node.parent_id, [])
-                parent_child_nodes[node.parent_id].append(node.to_json(simple=True))
+                parent_child_nodes[node.parent_id].append(node.to_json(partial=True))
             else:
-                tree.append(node.to_json(simple=True))
+                tree.append(node.to_json(partial=True))
 
         # 组装树形结构
         leafs = tree

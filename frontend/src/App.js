@@ -23,13 +23,14 @@ function App() {
             } else {
               setPath(value);
             }
+            const location = window.location;
+            let targetHref = `${location.pathname}${location.hash}`;
             if (value) {
-              const location = window.location;
-              const targetHref = `${location.pathname}${location.hash}?path=${value}`;
-              // 需要保证不能刷新页面
-              history.pushState(null, null, targetHref);
-              // window.location.href = `${location.pathname}${location.hash}?path=${path}`;
+              targetHref = `${targetHref}?path=${value}`;
             }
+            // 需要保证不能刷新页面
+            history.pushState(null, null, targetHref);
+            // window.location.href = `${location.pathname}${location.hash}?path=${path}`;
           }}
         />
       </Col>

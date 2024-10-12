@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.validators import RegexValidator
 
 from django_tree_perm import settings
-from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_path_parent
+from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_path_parent, get_tree_paths
 from .manager import TreeNodeManager, TreeNodeQuerySet
 from .utils import user_to_json
 
@@ -80,7 +80,7 @@ class TreeNode(BaseTimeModel):
     def __str__(self):
         return f"TreeNode:{self.id} {self.path}"
 
-    def to_json(self, simple=False):
+    def to_json(self, partial=False):
         data = {
             "id": self.id,
             "name": self.name,
@@ -89,7 +89,7 @@ class TreeNode(BaseTimeModel):
             "is_key": self.is_key,
             "path": self.path,
         }
-        if not simple:
+        if not partial:
             data.update(
                 {
                     "disabled": self.disabled,
@@ -149,19 +149,19 @@ class PermRole(BaseTimeModel):
     name = models.CharField(
         verbose_name="唯一标识", max_length=64, db_index=True, unique=True, validators=[_validator()]
     )
-    alias = models.CharField(verbose_name="显示名称", max_length=64, default="")
-    description = models.CharField(verbose_name="描述", max_length=1024, default="")
+    alias = models.CharField(verbose_name="显示名称", max_length=64, default="", blank=True)
+    description = models.CharField(verbose_name="描述", max_length=1024, default="", blank=True)
     # 赋予该角色后，可以管理当前结点上的人员角色关系
     can_manage = models.BooleanField(verbose_name="允许管理结点", default=False)
 
-    def to_json(self, simple=False):
+    def to_json(self, partial=False, path=None):
         data = {
             "id": self.id,
             "name": self.name,
             "alias": self.alias,
             "can_manage": self.can_manage,
         }
-        if not simple:
+        if not partial or path:
             data.update(
                 {
                     "description": self.description,
@@ -169,6 +169,21 @@ class PermRole(BaseTimeModel):
                     "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
                 }
             )
+            if path:
+                paths = get_tree_paths(path)
+                node_role_qs = NodeRole.objects.filter(node__path__in=paths, role_id=self.id).select_related(
+                    "user", "node"
+                )
+                data["user_set"] = []
+                for row in node_role_qs:
+                    item = row.to_json(partial=True)
+                    item.update(
+                        {
+                            "user": user_to_json(row.user),
+                            "node": row.node.to_json(partial=True),
+                        }
+                    )
+                    data["user_set"].append(item)
         return data
 
 
@@ -184,11 +199,19 @@ class NodeRole(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="noderole_set")
     created_at = models.DateTimeField("创建时间", auto_now_add=True)
 
-    def to_json(self):
+    def to_json(self, partial=False):
         data = {
             "id": self.id,
-            "role": self.role.to_json(simple=True),
-            "user": user_to_json(self.user),
+            "node_id": self.node_id,
+            "role_id": self.role_id,
+            "user_id": self.user_id,
             "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
         }
+        if not partial:
+            data.update(
+                {
+                    "role": self.role.to_json(partial=True),
+                    "user": user_to_json(self.user),
+                }
+            )
         return data

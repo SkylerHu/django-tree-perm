@@ -4,7 +4,6 @@ import datetime
 
 from django.conf import settings
 from django.forms.models import model_to_dict
-from django.contrib.auth.models import AbstractUser
 
 
 def user_to_json(user):
@@ -20,9 +19,3 @@ def user_to_json(user):
         else:
             data[k] = str(v)
     return data
-
-
-def instance_to_json(instance, **kwargs):
-    if isinstance(instance, AbstractUser):
-        return user_to_json(instance)
-    return instance.to_json(**kwargs)

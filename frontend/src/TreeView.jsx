@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import PropTypes from 'prop-types';
 import {
   PlusOutlined,
@@ -7,6 +7,7 @@ import {
   FormOutlined,
   DeleteOutlined,
   MenuUnfoldOutlined,
+  AimOutlined,
 } from '@ant-design/icons';
 import { message, Tree, Input, Row, Col, Button, Modal, Form, Checkbox, Space, Dropdown, Tooltip, Spin } from 'antd';
 
@@ -15,7 +16,13 @@ import * as Enum from 'js-enumerate';
 import SelectView from './restful-antd/components/SelectView';
 import { useProtect } from './restful-antd/hooks';
 import requests from './restful-antd/requests';
-import { TreeApi, getPathParent, COMMON_FORM_COL_PROPS } from './tools';
+import {
+  TreeApi,
+  getPathParent,
+  COMMON_FORM_COL_PROPS,
+  COMMON_MODAL_PROPS,
+  TREE_SPLIT_NODE_FLAG,
+} from './tools';
 
 const NodeMenu = new Enum([
   { key: 'REFRESH', value: 'refresh', label: '加载子结点' },
@@ -45,7 +52,7 @@ const findNodeByPath = (treeData, path) => {
       return node;
     }
     if (node.children) {
-      if (path && node.path && path.startsWith(node.path)) {
+      if (path && node.path && path.startsWith(`${node.path}${TREE_SPLIT_NODE_FLAG}`)) {
         return findNodeByPath(node.children, path);
       }
     }
@@ -171,6 +178,7 @@ const TreeView = ({ defaultValue, onChange }) => {
   // 树结构数据
   const [treeData, setTreeData] = useState([]);
   const [selectedKey, setSelectedKey] = useState(defaultValue);
+  const treeRef = useRef();
   // 展开的结点
   const [expandedKeys, setExpandedKeys] = useState([]);
   const [isExpanded, setExpanded] = useState(false);
@@ -179,18 +187,21 @@ const TreeView = ({ defaultValue, onChange }) => {
   // 搜索值
   const [searchValue, setSearchValue] = useState();
 
-  const onTreeNodeSelect = useCallback((key, node) => {
-    if (key) {
-      setSelectedKey(key);
-      if (!node) {
-        node = findNodeByPath(treeData, null, key);
+  const onTreeNodeSelect = useCallback(
+    (key, node) => {
+      if (key) {
+        setSelectedKey(key);
+        if (!node) {
+          node = findNodeByPath(treeData, null, key);
+        }
+        if (typeof onChange === 'function') {
+          onChange(node);
+        }
       }
-      if (typeof onChange === 'function') {
-        onChange(node);
-      }
-    }
-    // 不允许取消选择
-  }, [onChange, treeData]);
+      // 不允许取消选择
+    },
+    [onChange, treeData],
+  );
 
   // 根据结点刷新其子结点的数据
   const refreshByNode = useCallback(
@@ -213,7 +224,7 @@ const TreeView = ({ defaultValue, onChange }) => {
               // 刷新该结点后，默认展开展示
               setExpandedKeys(oldKeys => {
                 // 过掉该结点下所有展开的子结点，使其可以再次触发onLoad
-                const keys = oldKeys.filter(key => !key.startsWith(`${node.path}.`));
+                const keys = oldKeys.filter(key => !key.startsWith(`${node.path}${TREE_SPLIT_NODE_FLAG}`));
                 if (!keys.includes(node[TREE_KEY_FIELD])) {
                   keys.push(node[TREE_KEY_FIELD]);
                 }
@@ -285,17 +296,20 @@ const TreeView = ({ defaultValue, onChange }) => {
   );
 
   // 结点显示的样式
-  const getNodeStyle = useCallback((node) => {
-    let style = {};
-    if (node.is_key) {
-      style.fontWeight = 'bold';
-      style.color = '#fa8c16';
-      if (searchValue && node.name.indexOf(searchValue) > -1) {
-        style.color = '#fa541c';
+  const getNodeStyle = useCallback(
+    node => {
+      let style = {};
+      if (node.is_key) {
+        style.fontWeight = 'bold';
+        style.color = '#fa8c16';
+        if (searchValue && node.name.indexOf(searchValue) > -1) {
+          style.color = '#fa541c';
+        }
       }
-    }
-    return style;
-  }, [searchValue]);
+      return style;
+    },
+    [searchValue],
+  );
 
   // 结点可以操作的菜单列表
   const nodeUseMenus = useCallback(node => {
@@ -392,7 +406,7 @@ const TreeView = ({ defaultValue, onChange }) => {
             enterButton
           />
         </Col>
-        <Col flex="120px">
+        <Col flex="150px">
           <Space>
             <Tooltip title="加载全部结点">
               <Button
@@ -420,14 +434,20 @@ const TreeView = ({ defaultValue, onChange }) => {
             <Tooltip title="新增根结点">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditModalVisiable(true)} />
             </Tooltip>
+            <Tooltip title="定位到当前选中的结点">
+              <Button type="primary" icon={<AimOutlined />} onClick={() => {
+                treeRef.current.scrollTo({ key: selectedKey });
+              }} />
+            </Tooltip>
           </Space>
         </Col>
       </Row>
-      <div className='cls-tree-view'>
-        <div className='cls-tree-wrapper'>
-          <div className='cls-tree-container'>
+      <div className="cls-scoll-container cls-tree-view">
+        <div className="cls-scoll-container-wrapper cls-tree-wrapper">
+          <div className="cls-scoll-container-content">
             <Spin tip="加载中" spinning={loading}>
               <Tree
+                ref={treeRef}
                 treeData={treeData}
                 fieldNames={{
                   title: 'name',
@@ -445,9 +465,7 @@ const TreeView = ({ defaultValue, onChange }) => {
                       })
                     }
                   >
-                    <div style={getNodeStyle(node)}>
-                      {getNodeLabel(node)}
-                    </div>
+                    <div style={getNodeStyle(node)}>{getNodeLabel(node)}</div>
                     <Dropdown
                       menu={{
                         items: nodeUseMenus(node),
@@ -460,11 +478,16 @@ const TreeView = ({ defaultValue, onChange }) => {
                             }
                             case NodeMenu.EDIT: {
                               setLoading(true);
-                              requests.get(TreeApi.nodeDetail(node.id)).then(protect(resp => {
-                                setEditNode(node);
-                                setEditModalVisiable(true);
-                                resetFormData(resp.data);
-                              })).finally(protect(() => setLoading(false)));
+                              requests
+                                .get(TreeApi.nodeDetail(node.id))
+                                .then(
+                                  protect(resp => {
+                                    setEditNode(node);
+                                    setEditModalVisiable(true);
+                                    resetFormData(resp.data);
+                                  }),
+                                )
+                                .finally(protect(() => setLoading(false)));
                               break;
                             }
                             case NodeMenu.ADD: {
@@ -505,7 +528,9 @@ const TreeView = ({ defaultValue, onChange }) => {
                       }}
                     >
                       <span
-                        style={hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }}
+                        style={
+                          hoverNode && hoverNode[TREE_KEY_FIELD] === node[TREE_KEY_FIELD] ? null : { display: 'none' }
+                        }
                       >
                         <SettingOutlined style={{ padding: '0 5px' }} />
                       </span>
@@ -536,9 +561,7 @@ const TreeView = ({ defaultValue, onChange }) => {
       </div>
       <Modal
         title={NodeMenu.has(editType) ? NodeMenu.getLabel(editType) : '新增结点'}
-        width="50%"
-        maskClosable={false}
-        destroyOnClose
+        {...COMMON_MODAL_PROPS}
         confirmLoading={loading}
         open={editModalVisiable}
         onOk={() => onModealConfirm()}

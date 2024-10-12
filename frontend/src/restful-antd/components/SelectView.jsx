@@ -8,6 +8,19 @@ import requests from '../requests';
 
 const _parseListResponse = data => data?.results || [];
 
+const initInnerValue = (value, isMulitple) => {
+  if (isMulitple) {
+    if (value instanceof Array) {
+      return value;
+    }
+    if (value !== undefined && value !== null) {
+      return [value];
+    }
+    return [];
+  }
+  return value;
+};
+
 const SelectView = ({
   value,
   onChange,
@@ -30,7 +43,7 @@ const SelectView = ({
   // 是否多选
   const [isMultiple, setMultiple] = useState(mode === 'multiple');
   // 选中的值
-  const [innerValue, setInnverValue] = useState(value);
+  const [innerValue, setInnverValue] = useState(initInnerValue(value, mode === 'multiple'));
   // 远程搜索，用户输入的关键字
   const [searchValue, setSearchValue] = useState();
   const [loading, setLoading] = useState(false);
@@ -62,9 +75,9 @@ const SelectView = ({
       if (deepEqual(oldValue, value)) {
         return oldValue;
       }
-      return value;
+      return initInnerValue(value, mode === 'multiple');
     });
-  }, [value]);
+  }, [value, mode]);
 
   // 被选中的值
   const selectedValues = useMemo(() => {
@@ -74,15 +87,12 @@ const SelectView = ({
     if (isMultiple) {
       return innerValue;
     }
+
     return [innerValue];
   }, [innerValue, isMultiple]);
 
   // 首次初始化
   useEffect(() => {
-    if (isMultiple) {
-      // 暂不支持多选
-      return;
-    }
     if (innerValue === null || innerValue === undefined || innerValue === '') {
       return;
     }
@@ -173,7 +183,8 @@ const SelectView = ({
       showSearch={true}
       onSearch={v => setSearchValue(v)}
       onClear={() => onValueChange(null)}
-      onSelect={(value, option) => onValueChange(value, option)}
+      onChange={(value, option) => onValueChange(value, option)}
+      // onSelect={(value, option) => onValueChange(value, option)}
     />
   );
 };
@@ -194,7 +205,7 @@ SelectView.propTypes = {
 
   fieldNames: PropTypes.object,
 
-  // 默认单选，多选：multiple
+  // 默认单选，多选： multiple
   mode: PropTypes.string,
   disabled: PropTypes.bool,
   // antd原生配置项
