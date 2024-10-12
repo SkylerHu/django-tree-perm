@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { UsergroupAddOutlined, UserDeleteOutlined, EditOutlined } from '@ant-design/icons';
-import { Form, Input, Checkbox, Modal, Spin, Card, Tag, Tooltip, Button, Row, Col, Space, message, Flex } from 'antd';
+import { UsergroupAddOutlined, UserDeleteOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { Form, Input, Checkbox, Modal, Spin, Card, Tag, Tooltip, Button, Row, Col, Space, message, Flex, Popconfirm } from 'antd';
 
 import * as Enum from 'js-enumerate';
 
@@ -85,7 +85,7 @@ const getUserLabel = user => {
   return label;
 };
 
-const RoleUser = ({ role, node }) => {
+const RoleUser = ({ role, node, onRoleDelete }) => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState({ ...role });
@@ -94,22 +94,19 @@ const RoleUser = ({ role, node }) => {
   const [roleFormRef] = Form.useForm();
   const [addUsersRef] = Form.useForm();
 
-  const fetchRoleDetail = useCallback(
-    () => {
-      setLoading(true);
-      if (!role.id || !node.id) {
-        setData({});
-        return;
-      }
-      requests.get(TreeApi.roleDetail(role.id, node.id)).then(
-        protect(resp => {
-          setData(resp.data);
-          setLoading(false);
-        }),
-      );
-    },
-    [protect, role.id, node.id],
-  );
+  const fetchRoleDetail = useCallback(() => {
+    setLoading(true);
+    if (!role.id || !node.id) {
+      setData({});
+      return;
+    }
+    requests.get(TreeApi.roleDetail(role.id, node.id)).then(
+      protect(resp => {
+        setData(resp.data);
+        setLoading(false);
+      }),
+    );
+  }, [protect, role.id, node.id]);
 
   useEffect(() => {
     fetchRoleDetail();
@@ -123,7 +120,7 @@ const RoleUser = ({ role, node }) => {
             <Col flex="auto">
               <Tooltip title={data.description}>{getRoleLabel(data)}</Tooltip>
             </Col>
-            <Col flex="90px">
+            <Col flex="120px">
               <Space size="small">
                 <Button
                   size="small"
@@ -137,36 +134,69 @@ const RoleUser = ({ role, node }) => {
                   size="small"
                   icon={<UsergroupAddOutlined />}
                   onClick={() => setOpenModal(RoleEditType.ADD_USER)}
-                ></Button>
+                />
                 <Button
                   size="small"
                   icon={<UserDeleteOutlined />}
                   style={openModal === RoleEditType.DEL_USER ? { color: 'red' } : null}
                   onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
-                ></Button>
+                />
+                <Popconfirm
+                  title="确认删除"
+                  description={`操作删除角色 ${data.name} ?`}
+                  okText="确认"
+                  cancelText="取消"
+                  onConfirm={() => {
+                    requests.delete(TreeApi.roleDetail(data.id), { params: { name: data.name } }).then(protect(() => {
+                      if (onRoleDelete) {
+                        onRoleDelete(role);
+                      }
+                    }));
+                  }}
+                >
+                  <Button
+                    size="small"
+                    icon={<DeleteOutlined />}
+                    style={{ color: 'red' }}
+                    onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
+                  />
+                </Popconfirm>
               </Space>
             </Col>
           </Row>
         }
       >
-        <Flex wrap gap={5}>
+        <Flex wrap gap={5} className="cls-view-match-parent">
           {data.user_set?.map(item => (
             <Tag
               key={item.id}
               color={item.node_id === node.id ? 'blue' : null}
               closeIcon={openModal === RoleEditType.DEL_USER && item.node_id === node.id}
-              onClose={(e) => {
+              onClose={e => {
                 e.preventDefault();
-                requests.delete(TreeApi.delUserRole(item.id)).then(protect(() => {
-                  setData(oldData => ({
-                    ...oldData,
+                requests
+                  .delete(TreeApi.delUserRole(item.id), {
                     // eslint-disable-next-line camelcase
-                    user_set: oldData.user_set.filter(row => row.id !== item.id),
-                  }));
-                }));
+                    params: { user_id: item.user_id, node_id: item.node_id, role_id: data.id },
+                  })
+                  .then(
+                    protect(() => {
+                      setData(oldData => ({
+                        ...oldData,
+                        // eslint-disable-next-line camelcase
+                        user_set: oldData.user_set.filter(row => row.id !== item.id),
+                      }));
+                    }),
+                  );
               }}
             >
-              {getUserLabel(item.user)}
+              {item.node_id === node.id ? (
+                getUserLabel(item.user)
+              ) : (
+                <Tooltip title={`继承自: ${item.node.path}`} color="#fff" overlayInnerStyle={{ color: '#000' }}>
+                  {getUserLabel(item.user)}
+                </Tooltip>
+              )}
             </Tag>
           ))}
         </Flex>
@@ -231,18 +261,14 @@ const RoleUser = ({ role, node }) => {
         onCancel={() => setOpenModal(null)}
       >
         <Form form={addUsersRef} {...COMMON_FORM_COL_PROPS}>
-          <Form.Item
-            name="user_ids"
-            label="用户"
-            rules={[{ required: true }]}
-          >
+          <Form.Item name="user_ids" label="用户" rules={[{ required: true }]}>
             <SelectView
               mode="multiple"
               restful={TreeApi.USERS}
               fieldNames={{ value: 'id', label: 'username' }}
               antdSelectProps={{
                 style: { width: '100%' },
-                optionRender: (option) => getUserLabel(option.data),
+                optionRender: option => getUserLabel(option.data),
               }}
             />
           </Form.Item>
@@ -255,6 +281,7 @@ const RoleUser = ({ role, node }) => {
 RoleUser.propTypes = {
   role: PropTypes.object.isRequired,
   node: PropTypes.object.isRequired,
+  onRoleDelete: PropTypes.func,
 };
 
 export { RoleEditView };

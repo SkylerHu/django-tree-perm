@@ -1,13 +1,24 @@
 import React, { useState, useMemo, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { Spin, Descriptions, List, Row, Col, Button, Modal, Form, Input, Checkbox, message } from 'antd';
+import { CopyOutlined } from '@ant-design/icons';
+import { Spin, Descriptions, List, Row, Col, Button, Modal, Form, message } from 'antd';
 
 import { useProtect } from './restful-antd/hooks';
 import requests from './restful-antd/requests';
 import { TreeApi, COMMON_FORM_COL_PROPS, COMMON_MODAL_PROPS } from './tools';
-import RoleUser from './RoleUser';
+import RoleUser, { RoleEditView } from './RoleUser';
 
 const LIST_PAGE_SIZE = 100;
+
+async function copyTextToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    message.success(`成功拷贝: ${text}`);
+  } catch (err) {
+    // eslint-disable-next-line no-console
+    console.error('Failed to copy text: ', err);
+  }
+}
 
 const NodeView = forwardRef(({ path }, ref) => {
   const [protect] = useProtect();
@@ -38,10 +49,12 @@ const NodeView = forwardRef(({ path }, ref) => {
 
   const fetchRoles = useCallback(() => {
     setRoleLoading(true);
-    requests.get(TreeApi.ROLES).then(protect((resp) => {
-      setRolesData(resp.data);
-      setRoleLoading(false);
-    }));
+    requests.get(TreeApi.ROLES).then(
+      protect(resp => {
+        setRolesData(resp.data);
+        setRoleLoading(false);
+      }),
+    );
   }, [protect]);
 
   useImperativeHandle(
@@ -54,7 +67,7 @@ const NodeView = forwardRef(({ path }, ref) => {
 
   useEffect(() => {
     fetchRoles();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -71,7 +84,12 @@ const NodeView = forwardRef(({ path }, ref) => {
       {
         key: 'name',
         label: '标识',
-        children: node.name,
+        children: (
+          <span>
+            {node.name}
+            <CopyOutlined style={{ marginLeft: 5 }} onClick={() => copyTextToClipboard(node.name)}/>
+          </span>
+        ),
       },
       {
         key: 'alias',
@@ -97,7 +115,12 @@ const NodeView = forwardRef(({ path }, ref) => {
         key: 'path',
         label: '路径',
         span: 2,
-        children: node.path,
+        children: (
+          <span>
+            {node.path}
+            <CopyOutlined style={{ marginLeft: 5 }} onClick={() => copyTextToClipboard(node.path)}/>
+          </span>
+        ),
       },
       {
         key: 'description',
@@ -118,28 +141,39 @@ const NodeView = forwardRef(({ path }, ref) => {
       <div className="cls-scoll-container-wrapper">
         <div className="cls-scoll-container-content">
           <Spin spinning={loading}>
-            <Descriptions title={<div className="cls-common-title">基本信息</div>} bordered column={3} items={descItems} />
+            <Descriptions
+              title={<div className="cls-common-title">基本信息</div>}
+              bordered
+              column={3}
+              items={descItems}
+            />
           </Spin>
           <Spin spinning={roleLoading}>
             <List
               className="cls-role-list-view"
-              header={(
+              header={
                 <Row>
-                  <Col flex="auto"><div className="cls-common-title">角色成员</div></Col>
+                  <Col flex="auto">
+                    <div className="cls-common-title">角色成员</div>
+                  </Col>
                   <Col flex="100px">
-                    <Button
-                      type="primary"
-                      onClick={() => setRoleModalVisiable(true)}
-                    >新增角色</Button>
+                    <Button type="primary" onClick={() => setRoleModalVisiable(true)}>
+                      新增角色
+                    </Button>
                   </Col>
                 </Row>
-              )}
+              }
               grid={{ gutter: 10, column: 3 }}
               dataSource={rolesData.results}
               loading={roleLoading}
               renderItem={item => (
                 <List.Item>
-                  <RoleUser role={item} node={node}/>
+                  <RoleUser role={item} node={node} onRoleDelete={(data) => {
+                    setRolesData(oldData => ({
+                      ...oldData,
+                      results: oldData.results.filter(row => row.id !== data.id),
+                    }));
+                  }}/>
                 </List.Item>
               )}
               pagination={rolesData.count > LIST_PAGE_SIZE ? { pageSize: LIST_PAGE_SIZE } : false}
@@ -156,62 +190,23 @@ const NodeView = forwardRef(({ path }, ref) => {
           roleFormRef.validateFields().then(
             protect(values => {
               setRoleLoading(true);
-              requests.post(TreeApi.ROLES, values).then(protect(() => {
-                message.success('新增角色成功');
-                onRoleModalClose();
-                fetchRoles();
-              })).finally(protect(() => setRoleLoading(false)));
-            })
+              requests
+                .post(TreeApi.ROLES, values)
+                .then(
+                  protect(() => {
+                    message.success('新增角色成功');
+                    onRoleModalClose();
+                    fetchRoles();
+                  }),
+                )
+                .finally(protect(() => setRoleLoading(false)));
+            }),
           );
         }}
         onCancel={() => onRoleModalClose()}
       >
         <Form form={roleFormRef} {...COMMON_FORM_COL_PROPS}>
-          <Form.Item
-            name="name"
-            label="标识"
-            rules={[
-              {
-                required: true,
-                pattern: /^[a-z]([a-z0-9_-]){0,62}[a-z0-9]$/,
-                message: '由小写字母、数字、中横线、下划线组成，字母开头、字母或数据结尾，长度范围为2~64',
-              },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="alias"
-            label="别名"
-            rules={[
-              {
-                max: 64,
-                message: '最多64个字符',
-              },
-            ]}
-          >
-            <Input />
-          </Form.Item>
-          <Form.Item
-            name="description"
-            label="描述"
-            rules={[
-              {
-                max: 1024,
-                message: '最多1024个字符',
-              },
-            ]}
-          >
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
-          </Form.Item>
-          <Form.Item
-            name="can_manage"
-            label="允许管理结点"
-            valuePropName="checked"
-            help="勾选后，该角色下的所有成员可对相应结点进行管理，包括删除操作"
-          >
-            <Checkbox />
-          </Form.Item>
+          <RoleEditView />
         </Form>
       </Modal>
     </div>

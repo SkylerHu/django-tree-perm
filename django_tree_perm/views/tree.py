@@ -184,6 +184,19 @@ class PermRoleEditView(BaseRetrieveModelMixin, BaseUpdateModelMixin, BaseDestory
         data = instance.to_json(path=node.path if node else None)
         return JsonResponse(data, status=HTTPStatus.OK)
 
+    def delete(self, request, *args, pk=None, **kwargs):
+        instance = self.get_object(pk)
+        if instance.noderole_set.exists():
+            return JsonResponse(
+                {
+                    "error": "角色存在关联的用户，请先删除角色所有结点下的用户后再操作删除",
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        data = self.model_to_json(request, instance)
+        instance.delete()
+        return JsonResponse(data, status=HTTPStatus.NO_CONTENT)
+
 
 class NodeRoleView(BaseCreateModelMixin, BaseListModelMixin):
 

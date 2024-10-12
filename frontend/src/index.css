@@ -46,7 +46,7 @@ code {
 .cls-scoll-container-content {
   flex: 1; /* flex: 1 使子容器自动填充剩余空间 */
   padding-bottom: 100px;
-  overflow-y: auto;
+  overflow: auto;
 }
 
 /** 服务树样式 **/

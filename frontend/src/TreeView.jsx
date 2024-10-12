@@ -7,7 +7,6 @@ import {
   FormOutlined,
   DeleteOutlined,
   MenuUnfoldOutlined,
-  AimOutlined,
 } from '@ant-design/icons';
 import { message, Tree, Input, Row, Col, Button, Modal, Form, Checkbox, Space, Dropdown, Tooltip, Spin } from 'antd';
 
@@ -406,7 +405,7 @@ const TreeView = ({ defaultValue, onChange }) => {
             enterButton
           />
         </Col>
-        <Col flex="150px">
+        <Col flex="120px">
           <Space>
             <Tooltip title="加载全部结点">
               <Button
@@ -434,11 +433,6 @@ const TreeView = ({ defaultValue, onChange }) => {
             <Tooltip title="新增根结点">
               <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditModalVisiable(true)} />
             </Tooltip>
-            <Tooltip title="定位到当前选中的结点">
-              <Button type="primary" icon={<AimOutlined />} onClick={() => {
-                treeRef.current.scrollTo({ key: selectedKey });
-              }} />
-            </Tooltip>
           </Space>
         </Col>
       </Row>
@@ -447,6 +441,7 @@ const TreeView = ({ defaultValue, onChange }) => {
           <div className="cls-scoll-container-content">
             <Spin tip="加载中" spinning={loading}>
               <Tree
+
                 ref={treeRef}
                 treeData={treeData}
                 fieldNames={{
@@ -465,7 +460,7 @@ const TreeView = ({ defaultValue, onChange }) => {
                       })
                     }
                   >
-                    <div style={getNodeStyle(node)}>{getNodeLabel(node)}</div>
+                    <div id={`node-${node.path}`} style={getNodeStyle(node)}>{getNodeLabel(node)}</div>
                     <Dropdown
                       menu={{
                         items: nodeUseMenus(node),
@@ -508,7 +503,7 @@ const TreeView = ({ defaultValue, onChange }) => {
                                 ),
                                 destroyOnClose: true,
                                 onOk: () => {
-                                  requests.delete(TreeApi.nodeDetail(node.id)).then(
+                                  requests.delete(TreeApi.nodeDetail(node.id), { params: { path: node.path } }).then(
                                     protect(() => {
                                       message.success(`删除 ${node.path} 成功`);
                                       setTreeData(oldData => {
