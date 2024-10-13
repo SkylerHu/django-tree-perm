@@ -40,6 +40,8 @@ const NODE_MENU_ICON = {
 // 服务树作为关键key的字段
 const TREE_KEY_FIELD = 'path';
 
+const DEFALUT_DEPTH = 2;
+
 /**
  * 从数结构数据中，根据path找到对应结点
  */
@@ -180,7 +182,7 @@ const genAllKeys = treeData => {
 /**
  * 树展示组件
  */
-const TreeView = ({ defaultValue, onChange }) => {
+const TreeView = ({ user, defaultValue, onChange }) => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
 
@@ -292,10 +294,11 @@ const TreeView = ({ defaultValue, onChange }) => {
   );
 
   useEffect(() => {
-    if (defaultValue) {
+    if (defaultValue && defaultValue.split(TREE_SPLIT_NODE_FLAG).length > DEFALUT_DEPTH) {
+      // 有默认值，且结点深度超过设定值则按照搜索加载
       setSearchValue(defaultValue);
     } else {
-      fetchAllNode({ depth: 2 });
+      fetchAllNode({ depth: DEFALUT_DEPTH });
     }
     // 仅需在初始化时加载一次即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -308,7 +311,7 @@ const TreeView = ({ defaultValue, onChange }) => {
     }
     setTimeout(() => {
       if (!searchValue) {
-        fetchAllNode({ depth: 2 });
+        fetchAllNode({ depth: DEFALUT_DEPTH });
       } else {
         fetchAllNode({ search: searchValue });
       }
@@ -439,7 +442,6 @@ const TreeView = ({ defaultValue, onChange }) => {
         <Col flex="auto">
           <Input.Search
             defaultValue={defaultValue}
-            styles={{ width: '100%' }}
             placeholder="输入进行模糊搜索"
             loading={loading}
             onSearch={v => {
@@ -451,7 +453,7 @@ const TreeView = ({ defaultValue, onChange }) => {
             enterButton
           />
         </Col>
-        <Col flex="120px">
+        <Col flex={user.tree_manager ? '120px' : '80px'}>
           <Space>
             <Tooltip title="加载全部结点">
               <Button
@@ -476,9 +478,13 @@ const TreeView = ({ defaultValue, onChange }) => {
                 }}
               />
             </Tooltip>
-            <Tooltip title="新增根结点">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditModalVisiable(true)} />
-            </Tooltip>
+            {
+              user.tree_manager && (
+                <Tooltip title="新增根结点">
+                  <Button type="primary" icon={<PlusOutlined />} onClick={() => setEditModalVisiable(true)} />
+                </Tooltip>
+              )
+            }
           </Space>
         </Col>
       </Row>
@@ -628,7 +634,7 @@ const TreeView = ({ defaultValue, onChange }) => {
               },
             ]}
           >
-            <Input disabled={editType === NodeMenu.EDIT} />
+            <Input disabled={editType === NodeMenu.EDIT} count={{ show: true, max: 64 }}/>
           </Form.Item>
           <Form.Item
             name="alias"
@@ -640,7 +646,7 @@ const TreeView = ({ defaultValue, onChange }) => {
               },
             ]}
           >
-            <Input />
+            <Input count={{ show: true, max: 64 }}/>
           </Form.Item>
           <Form.Item
             name="description"
@@ -652,7 +658,7 @@ const TreeView = ({ defaultValue, onChange }) => {
               },
             ]}
           >
-            <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
+            <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} count={{ show: true, max: 1024 }}/>
           </Form.Item>
           <Form.Item name="parent_id" label="父结点" help="无父类结点则新增的是根结点，更改则会影响其所有子结点">
             <SelectView
@@ -676,6 +682,7 @@ const TreeView = ({ defaultValue, onChange }) => {
 };
 
 TreeView.propTypes = {
+  user: PropTypes.object,
   // 传递树结点路径
   defaultValue: PropTypes.string,
   onChange: PropTypes.func,

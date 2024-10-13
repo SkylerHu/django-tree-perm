@@ -75,10 +75,14 @@ instance.interceptors.response.use((response) => {
   return response;
 }, (error) => {
   const { errMsg } = formatRequestError(error);
-  notification.error({
+  const config = {
     message: '操作失败，请重试',
     description: errMsg,
-  });
+  };
+  if (error?.response?.status === 401) {
+    config.key = '401';
+  }
+  notification.error(config);
   return Promise.reject(error);
 });
 

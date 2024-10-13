@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { UsergroupAddOutlined, UserDeleteOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { UsergroupAddOutlined, UsergroupDeleteOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
 import { Form, Input, Checkbox, Modal, Spin, Card, Tag, Tooltip, Button, Row, Col, Space, message, Flex, Popconfirm } from 'antd';
 
 import * as Enum from 'js-enumerate';
@@ -16,6 +16,7 @@ const RoleEditType = new Enum([
   { key: 'DEL_USER', value: 'del_user', label: '删除关联用户' },
 ]);
 
+// 角色表单 用于新增和编辑
 const RoleEditView = ({ isEdit = false }) => {
   return (
     <>
@@ -30,7 +31,7 @@ const RoleEditView = ({ isEdit = false }) => {
           },
         ]}
       >
-        <Input disabled={isEdit} />
+        <Input disabled={isEdit} count={{ show: true, max: 64 }}/>
       </Form.Item>
       <Form.Item
         name="alias"
@@ -42,7 +43,7 @@ const RoleEditView = ({ isEdit = false }) => {
           },
         ]}
       >
-        <Input />
+        <Input count={{ show: true, max: 64 }}/>
       </Form.Item>
       <Form.Item
         name="description"
@@ -54,7 +55,7 @@ const RoleEditView = ({ isEdit = false }) => {
           },
         ]}
       >
-        <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} />
+        <Input.TextArea autoSize={{ minRows: 3, maxRows: 6 }} count={{ show: true, max: 1024 }} />
       </Form.Item>
       <Form.Item
         name="can_manage"
@@ -72,11 +73,13 @@ RoleEditView.propTypes = {
   isEdit: PropTypes.bool,
 };
 
+// 用于角色展示信息
 const getRoleLabel = role => {
   let label = role.alias ? `${role.name} (${role.alias})` : role.name;
   return label;
 };
 
+// 用户展示信息
 const getUserLabel = user => {
   let label = user.username;
   if (user.first_name || user.last_name) {
@@ -85,13 +88,16 @@ const getUserLabel = user => {
   return label;
 };
 
-const RoleUser = ({ role, node, onRoleDelete }) => {
+
+const RoleUser = ({ user, role, node, onRoleDelete }) => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
+  // 角色数据
   const [data, setData] = useState({ ...role });
+  // 打开编辑弹窗
   const [openModal, setOpenModal] = useState();
-
   const [roleFormRef] = Form.useForm();
+  // 在结点下的角色关联新的用户
   const [addUsersRef] = Form.useForm();
 
   const fetchRoleDetail = useCallback(() => {
@@ -116,6 +122,10 @@ const RoleUser = ({ role, node, onRoleDelete }) => {
     fetchRoleDetail();
   }, [fetchRoleDetail]);
 
+  useEffect(() => {
+    setData(role);
+  }, [role]);
+
   return (
     <Spin spinning={loading}>
       <Card
@@ -124,47 +134,61 @@ const RoleUser = ({ role, node, onRoleDelete }) => {
             <Col flex="auto">
               <Tooltip title={data.description}>{getRoleLabel(data)}</Tooltip>
             </Col>
-            <Col flex="120px">
+            <Col flex={ user.tree_manager && user.node_manager ? '120px' : (user.tree_manager || user.node_manager ? '60px' : '0px')}>
               <Space size="small">
-                <Button
-                  size="small"
-                  icon={<EditOutlined />}
-                  onClick={() => {
-                    setOpenModal(RoleEditType.ROLE);
-                    roleFormRef.setFieldsValue(data);
-                  }}
-                />
-                <Button
-                  size="small"
-                  icon={<UsergroupAddOutlined />}
-                  onClick={() => setOpenModal(RoleEditType.ADD_USER)}
-                />
-                <Button
-                  size="small"
-                  icon={<UserDeleteOutlined />}
-                  style={openModal === RoleEditType.DEL_USER ? { color: 'red' } : null}
-                  onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
-                />
-                <Popconfirm
-                  title="确认删除"
-                  description={`操作删除角色 ${data.name} ?`}
-                  okText="确认"
-                  cancelText="取消"
-                  onConfirm={() => {
-                    requests.delete(TreeApi.roleDetail(data.id), { params: { name: data.name } }).then(protect(() => {
-                      if (onRoleDelete) {
-                        onRoleDelete(role);
-                      }
-                    }));
-                  }}
-                >
-                  <Button
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    style={{ color: 'red' }}
-                    onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
-                  />
-                </Popconfirm>
+                {
+                  user.node_manager && (
+                    <>
+                      <Button
+                        size="small"
+                        icon={<UsergroupAddOutlined />}
+                        onClick={() => setOpenModal(RoleEditType.ADD_USER)}
+                      />
+                      <Tooltip title="点击后可操作删除关联用户">
+                        <Button
+                          size="small"
+                          icon={<UsergroupDeleteOutlined />}
+                          style={openModal === RoleEditType.DEL_USER ? { color: 'red' } : null}
+                          onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
+                        />
+                      </Tooltip>
+                    </>
+                  )
+                }
+                {
+                  user.tree_manager && (
+                    <>
+                      <Button
+                        size="small"
+                        icon={<EditOutlined />}
+                        onClick={() => {
+                          setOpenModal(RoleEditType.ROLE);
+                          roleFormRef.setFieldsValue(data);
+                        }}
+                      />
+                      <Popconfirm
+                        title="确认删除"
+                        description={`操作删除角色 ${data.name} ?`}
+                        okText="确认"
+                        cancelText="取消"
+                        onConfirm={() => {
+                          requests.delete(TreeApi.roleDetail(data.id), { params: { name: data.name } }).then(protect(() => {
+                            if (onRoleDelete) {
+                              onRoleDelete(role);
+                            }
+                          }));
+                        }}
+                      >
+                        <Button
+                          size="small"
+                          icon={<DeleteOutlined />}
+                          style={{ color: 'red' }}
+                          onClick={() => (openModal ? setOpenModal(null) : setOpenModal(RoleEditType.DEL_USER))}
+                        />
+                      </Popconfirm>
+                    </>
+                  )
+                }
               </Space>
             </Col>
           </Row>
@@ -283,6 +307,7 @@ const RoleUser = ({ role, node, onRoleDelete }) => {
 };
 
 RoleUser.propTypes = {
+  user: PropTypes.object,
   role: PropTypes.object.isRequired,
   node: PropTypes.object.isRequired,
   onRoleDelete: PropTypes.func,

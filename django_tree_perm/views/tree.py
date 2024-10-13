@@ -4,9 +4,11 @@ from http import HTTPStatus
 
 from django.http import JsonResponse
 from django.shortcuts import render
+from django.contrib.auth import login, authenticate
 
 from django_tree_perm.models import User, TreeNode, PermRole, NodeRole
-from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
+from django_tree_perm.models.utils import user_to_json
+from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_tree_paths
 from django_tree_perm.controller import TreeNodeManger
 
 from .base import (
@@ -21,6 +23,47 @@ from .base import (
 
 def main_view(request):
     return render(request, "tree_perm/main.html")
+
+
+class MetaView(BaseView):
+
+    @classmethod
+    def gen_user_data(cls, user, path=None):
+        data = user_to_json(user)
+        # 是否具备树和角色的管理权限
+        data["tree_manager"] = user.is_superuser
+        # 是否具备结点管理权限
+        node_manager = False
+        if path:
+            paths = get_tree_paths(path)
+            node_manager = NodeRole.objects.filter(
+                user_id=user.id, role__can_manage=True, node__path__in=paths
+            ).exists()
+        data["node_manager"] = node_manager
+        return data
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+
+        if user and user.is_authenticated:
+            path = request.GET.get("path", None)
+            data = self.gen_user_data(user, path=path)
+            return JsonResponse({"user": data}, status=HTTPStatus.OK)
+
+        return JsonResponse({}, status=HTTPStatus.UNAUTHORIZED)
+
+    def post(self, request, *args, **kwargs):
+        """用户登录"""
+        data = self.parese_request_body(request)
+        username = data.get("username")
+        password = data.get("password")
+
+        user = authenticate(username=username, password=password)
+        if user:
+            login(request, user)
+            data = self.gen_user_data(user)
+            return JsonResponse({"user": data}, status=HTTPStatus.OK)
+        return JsonResponse({"error": "用户名或者密码错误"}, status=HTTPStatus.BAD_REQUEST)
 
 
 class TreeNodeView(BaseListModelMixin):
@@ -150,12 +193,7 @@ def get_node_form_request(request):
     key_name = request.GET.get("key_name", None)
     node_id = request.GET.get("node_id", None)
     path = request.GET.get("path", None)
-    if key_name:
-        node = TreeNode.objects.filter(name=key_name, is_key=True).first()
-    elif node_id:
-        node = TreeNode.objects.filter(id=node_id).first()
-    elif path:
-        node = TreeNode.objects.filter(path=path).first()
+    node = TreeNodeManger.get_node_object(key_name=key_name, node_id=node_id, path=path)
     return node
 
 
@@ -186,10 +224,11 @@ class PermRoleEditView(BaseRetrieveModelMixin, BaseUpdateModelMixin, BaseDestory
 
     def delete(self, request, *args, pk=None, **kwargs):
         instance = self.get_object(pk)
-        if instance.noderole_set.exists():
+        obj = instance.noderole_set.first()
+        if obj:
             return JsonResponse(
                 {
-                    "error": "角色存在关联的用户，请先删除角色所有结点下的用户后再操作删除",
+                    "error": f"角色存在关联的用户，例如结点：{obj.node.path} ，请先删除角色所有结点下的用户后再重试",
                 },
                 status=HTTPStatus.BAD_REQUEST,
             )

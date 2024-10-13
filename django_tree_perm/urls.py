@@ -16,6 +16,7 @@ urlpatterns = [
                 path("nodes/<str:pk>/", views.TreeNodeEditView.as_view()),
                 path("load/", views.TreeLoadView.as_view()),
                 path("lazyload/", views.TreeLazyLoadView.as_view()),
+                path("meta/", views.MetaView.as_view()),
                 path("users/", views.UserListView.as_view()),
                 path("users/<str:pk>/", views.UserDetailView.as_view()),
                 path("roles/", views.PermRoleView.as_view()),

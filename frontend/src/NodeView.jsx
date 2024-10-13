@@ -8,7 +8,7 @@ import requests from './restful-antd/requests';
 import { TreeApi, COMMON_FORM_COL_PROPS, COMMON_MODAL_PROPS } from './tools';
 import RoleUser, { RoleEditView } from './RoleUser';
 
-
+// 复制到粘贴板
 async function copyTextToClipboard(text) {
   try {
     await navigator.clipboard.writeText(text);
@@ -19,7 +19,7 @@ async function copyTextToClipboard(text) {
   }
 }
 
-const NodeView = forwardRef(({ path }, ref) => {
+const NodeView = forwardRef(({ user, path }, ref) => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
   const [node, setNode] = useState({});
@@ -70,17 +70,17 @@ const NodeView = forwardRef(({ path }, ref) => {
   );
 
   useEffect(() => {
+    fetchNodeDetail(path);
+  }, [path, fetchNodeDetail]);
+
+  useEffect(() => {
     fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     fetchRoles();
-  }, [fetchRoles]);
-
-  useEffect(() => {
-    fetchNodeDetail(path);
-  }, [path, fetchNodeDetail]);
+  }, [path, fetchRoles]);
 
   const onRoleModalClose = useCallback(() => {
     setRoleModalVisiable(false);
@@ -164,18 +164,22 @@ const NodeView = forwardRef(({ path }, ref) => {
                   <Col flex="auto">
                     <div className="cls-common-title">角色成员</div>
                   </Col>
-                  <Col flex="300px">
+                  <Col flex={user.tree_manager ? '350px' : '250px'}>
                     <Space>
                       <Input.Search
-                        styles={{ width: '100%' }}
-                        placeholder="输入进行搜索角色"
+                        style={{ width: 250 }}
+                        placeholder="输入角色进行搜索"
                         loading={roleLoading}
                         onSearch={v => setRoleFilters(filters => ({ ...filters, search: v }))}
                         enterButton
                       />
-                      <Button type="primary" onClick={() => setRoleModalVisiable(true)}>
-                        新增角色
-                      </Button>
+                      {
+                        user.tree_manager && (
+                          <Button type="primary" onClick={() => setRoleModalVisiable(true)}>
+                            新增角色
+                          </Button>
+                        )
+                      }
                     </Space>
                   </Col>
                 </Row>
@@ -184,8 +188,8 @@ const NodeView = forwardRef(({ path }, ref) => {
               dataSource={rolesData.results}
               loading={roleLoading}
               renderItem={item => (
-                <List.Item key={item.id}>
-                  <RoleUser role={item} node={node} onRoleDelete={(data) => {
+                <List.Item>
+                  <RoleUser user={user} role={item} node={node} onRoleDelete={(data) => {
                     setRolesData(oldData => ({
                       count: oldData.count - 1,
                       results: oldData.results.filter(row => row.id !== data.id),
@@ -243,6 +247,7 @@ const NodeView = forwardRef(({ path }, ref) => {
 
 NodeView.displayName = 'NodeView';
 NodeView.propTypes = {
+  user: PropTypes.object,
   path: PropTypes.string,
   onChange: PropTypes.func,
 };

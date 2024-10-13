@@ -147,22 +147,30 @@ class TreeNodeManger(object):
 
     @classmethod
     def find_parent_node(cls, parent=None, parent_id=None, parent_path=None, required=False):
-        try:
-            if not parent and parent_id:
-                parent = TreeNode.objects.get(id=parent_id)
-            if not parent and parent_path:
-                parent = TreeNode.objects.get(path=parent_path)
-        except ObjectDoesNotExist:
-            pass
-
+        parent = cls.get_node_object(node=parent, node_id=parent_id, path=parent_path, required=required)
         if parent:
             if parent.is_key:
                 raise exceptions.ParamsValidateException("This key node is not allowed to be a parent node.")
-            if parent.disabled:
+        return parent
+
+    @classmethod
+    def get_node_object(cls, node=None, node_id=None, key_name=None, path=None, required=False):
+        try:
+            if not node and key_name:
+                node = TreeNode.objects.get(name=key_name, is_key=True)
+            if not node and node_id:
+                node = TreeNode.objects.get(id=node_id)
+            if not node and path:
+                node = TreeNode.objects.get(path=path)
+        except ObjectDoesNotExist:
+            pass
+
+        if node:
+            if node.disabled:
                 raise exceptions.ParamsValidateException("This node is disabled.")
         elif required:
             raise exceptions.ParamsValidateException("Parent node not found, and cannot be null.")
-        return parent
+        return node
 
     @classmethod
     def to_json_tree(cls, queryset, trace_to_root=True):
