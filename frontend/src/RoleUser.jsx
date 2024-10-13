@@ -134,10 +134,10 @@ const RoleUser = ({ user, role, node, onRoleDelete }) => {
             <Col flex="auto">
               <Tooltip title={data.description}>{getRoleLabel(data)}</Tooltip>
             </Col>
-            <Col flex={ user.tree_manager && user.node_manager ? '120px' : (user.tree_manager || user.node_manager ? '60px' : '0px')}>
+            <Col flex={ user.tree_manager ? '120px' : (user.node_manager ? '60px' : '0px')}>
               <Space size="small">
                 {
-                  user.node_manager && (
+                  (user.tree_manager || user.node_manager) && (
                     <>
                       <Button
                         size="small"
