@@ -37,8 +37,12 @@ const NODE_MENU_ICON = {
   [NodeMenu.DELETE]: <DeleteOutlined />,
 };
 
+// 服务树作为关键key的字段
 const TREE_KEY_FIELD = 'path';
 
+/**
+ * 从数结构数据中，根据path找到对应结点
+ */
 const findNodeByPath = (treeData, path) => {
   if (!path) {
     return null;
@@ -59,7 +63,9 @@ const findNodeByPath = (treeData, path) => {
   return null;
 };
 
-// 更新是否是叶子结点
+/**
+ * 更新结点isLeaf属性，标记是否叶子结点，叶子结点无图标操作onLoad
+ */
 const refreshNodeLeaf = (treeData, isLoadAll = false) => {
   for (let i = 0; i < treeData.length; i++) {
     const node = treeData[i];
@@ -75,7 +81,7 @@ const refreshNodeLeaf = (treeData, isLoadAll = false) => {
 };
 
 /**
- * 向树结构数据treeData中，将nodes插入作为某结点的chi˜ldren
+ * 向树结构数据treeData中，将nodes插入作为某结点的children
  */
 const insertChildren = (treeData, nodes, parentPath) => {
   // 无任何子结点
@@ -101,7 +107,9 @@ const insertChildren = (treeData, nodes, parentPath) => {
   return treeData;
 };
 
-// 更新结点信息
+/**
+ * 结点编辑后，树中寻找对应结点更新信息
+ */
 const refreshNodeInfo = (treeData, node) => {
   const curNode = findNodeByPath(treeData, node.path);
   if (curNode) {
@@ -110,7 +118,10 @@ const refreshNodeInfo = (treeData, node) => {
   return treeData;
 };
 
-// 插入子结点
+/**
+ * 根据父类path找到父类结点，将新增的结点插入到children中
+ * @returns
+ */
 const nodeInsertChild = (treeData, parentPath, node) => {
   const parentNode = findNodeByPath(treeData, parentPath);
   if (!parentNode) {
@@ -128,6 +139,9 @@ const nodeInsertChild = (treeData, parentPath, node) => {
   return treeData;
 };
 
+/**
+ * 树结构数据移除结点
+ */
 const nodeRemoveChild = (treeData, node) => {
   const parentPath = getPathParent(node.path);
   if (!parentPath) {
@@ -141,6 +155,7 @@ const nodeRemoveChild = (treeData, node) => {
   return treeData;
 };
 
+// node展示信息
 const getNodeLabel = node => {
   let label = node.alias ? `${node.name} (${node.alias})` : node.name;
   return label;
@@ -168,23 +183,28 @@ const genAllKeys = treeData => {
 const TreeView = ({ defaultValue, onChange }) => {
   const [protect] = useProtect();
   const [loading, setLoading] = useState(false);
-  // 编辑表单
-  const [editModalVisiable, setEditModalVisiable] = useState(false);
-  const [formRef] = Form.useForm();
-  // 编辑类型
-  const [editType, setEditType] = useState();
-  const [editNode, setEditNode] = useState();
+
+  const treeRef = useRef();
   // 树结构数据
   const [treeData, setTreeData] = useState([]);
   const [selectedKey, setSelectedKey] = useState(defaultValue);
-  const treeRef = useRef();
   // 展开的结点
   const [expandedKeys, setExpandedKeys] = useState([]);
+  const [loadedKeys, setLoadedKeys] = useState([]);
+
+  // 编辑类型
+  const [editType, setEditType] = useState();
+  const [editNode, setEditNode] = useState();
+  // 编辑表单
+  const [editModalVisiable, setEditModalVisiable] = useState(false);
+  const [formRef] = Form.useForm();
+  // 展开所有结点
   const [isExpanded, setExpanded] = useState(false);
   // 鼠标移动到的结点
   const [hoverNode, setHoverNode] = useState();
   // 搜索值
   const [searchValue, setSearchValue] = useState();
+  const [searchCounter, setSearchCounter] = useState(0);
 
   const onTreeNodeSelect = useCallback(
     (key, node) => {
@@ -223,7 +243,15 @@ const TreeView = ({ defaultValue, onChange }) => {
               // 刷新该结点后，默认展开展示
               setExpandedKeys(oldKeys => {
                 // 过掉该结点下所有展开的子结点，使其可以再次触发onLoad
-                const keys = oldKeys.filter(key => !key.startsWith(`${node.path}${TREE_SPLIT_NODE_FLAG}`));
+                const keys = oldKeys.filter(key => !key.startsWith(`${node[TREE_KEY_FIELD]}${TREE_SPLIT_NODE_FLAG}`));
+                if (!keys.includes(node[TREE_KEY_FIELD])) {
+                  keys.push(node[TREE_KEY_FIELD]);
+                }
+                return keys;
+              });
+              // 处理异步加载的key
+              setLoadedKeys((oldKeys) => {
+                const keys = oldKeys.filter(key => !key.startsWith(`${node[TREE_KEY_FIELD]}${TREE_SPLIT_NODE_FLAG}`));
                 if (!keys.includes(node[TREE_KEY_FIELD])) {
                   keys.push(node[TREE_KEY_FIELD]);
                 }
@@ -237,6 +265,7 @@ const TreeView = ({ defaultValue, onChange }) => {
     [protect],
   );
 
+  // 搜索结点 / 不传递参数时加载所有结点
   const fetchAllNode = useCallback(
     (params = null) => {
       setLoading(true);
@@ -248,7 +277,13 @@ const TreeView = ({ defaultValue, onChange }) => {
             const nodes = resp.data.results;
             refreshNodeLeaf(nodes, isLoadAll);
             setTreeData(nodes);
-            setExpandedKeys(genAllKeys(nodes));
+            // 展开所有结点
+            const keys = genAllKeys(nodes);
+            setExpandedKeys(keys);
+            if (!isLoadAll) {
+              // 搜索过后重置异步加载的标记
+              setLoadedKeys([]);
+            }
           }),
         )
         .finally(protect(() => setLoading(false)));
@@ -257,7 +292,11 @@ const TreeView = ({ defaultValue, onChange }) => {
   );
 
   useEffect(() => {
-    fetchAllNode({ depth: 2 });
+    if (defaultValue) {
+      setSearchValue(defaultValue);
+    } else {
+      fetchAllNode({ depth: 2 });
+    }
     // 仅需在初始化时加载一次即可
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -274,7 +313,7 @@ const TreeView = ({ defaultValue, onChange }) => {
         fetchAllNode({ search: searchValue });
       }
     }, 200);
-  }, [searchValue, fetchAllNode]);
+  }, [searchValue, searchCounter, fetchAllNode]);
 
   // 重置表单
   const resetFormData = useCallback(
@@ -399,9 +438,16 @@ const TreeView = ({ defaultValue, onChange }) => {
       <Row gutter={10} wrap={false}>
         <Col flex="auto">
           <Input.Search
+            defaultValue={defaultValue}
             styles={{ width: '100%' }}
-            placeholder="输入关键字进行搜索"
-            onSearch={v => setSearchValue(v)}
+            placeholder="输入进行模糊搜索"
+            loading={loading}
+            onSearch={v => {
+              setSearchValue(v);
+              if (searchValue === v) {
+                setSearchCounter(searchCounter + 1);
+              }
+            }}
             enterButton
           />
         </Col>
@@ -534,7 +580,15 @@ const TreeView = ({ defaultValue, onChange }) => {
                 )}
                 filterTreeNode={searchValue ? node => searchValue && node.name.indexOf(searchValue) > -1 : undefined}
                 expandedKeys={expandedKeys}
-                onExpand={expandedKeys => setExpandedKeys(expandedKeys)}
+                onExpand={(expandedKeys, { expanded, node }) => {
+                  if (expanded && !loadedKeys.includes(node[TREE_KEY_FIELD])) {
+                    refreshByNode(node);
+                  } else {
+                    setExpandedKeys(expandedKeys);
+                  }
+                }}
+                loadedKeys={loadedKeys}
+                onLoad={(loadedKeys => setLoadedKeys(loadedKeys))}
                 loadData={node =>
                   new Promise(resolve => {
                     refreshByNode(node, resolve);

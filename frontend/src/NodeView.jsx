@@ -1,14 +1,13 @@
 import React, { useState, useMemo, forwardRef, useImperativeHandle, useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 import { CopyOutlined } from '@ant-design/icons';
-import { Spin, Descriptions, List, Row, Col, Button, Modal, Form, message } from 'antd';
+import { Spin, Descriptions, List, Row, Col, Button, Modal, Form, message, Space, Input } from 'antd';
 
 import { useProtect } from './restful-antd/hooks';
 import requests from './restful-antd/requests';
 import { TreeApi, COMMON_FORM_COL_PROPS, COMMON_MODAL_PROPS } from './tools';
 import RoleUser, { RoleEditView } from './RoleUser';
 
-const LIST_PAGE_SIZE = 100;
 
 async function copyTextToClipboard(text) {
   try {
@@ -25,8 +24,12 @@ const NodeView = forwardRef(({ path }, ref) => {
   const [loading, setLoading] = useState(false);
   const [node, setNode] = useState({});
 
+  // 加载角色列表
   const [roleLoading, setRoleLoading] = useState(false);
+  // eslint-disable-next-line camelcase
+  const [roleFilters, setRoleFilters] = useState({ page: 1, page_size: 20 });
   const [rolesData, setRolesData] = useState({});
+  // 新增角色表单
   const [roleFormRef] = Form.useForm();
   const [roleModalVisiable, setRoleModalVisiable] = useState(false);
 
@@ -49,13 +52,14 @@ const NodeView = forwardRef(({ path }, ref) => {
 
   const fetchRoles = useCallback(() => {
     setRoleLoading(true);
-    requests.get(TreeApi.ROLES).then(
+    // eslint-disable-next-line camelcase
+    requests.get(TreeApi.ROLES, { params: { ...roleFilters, path } }).then(
       protect(resp => {
         setRolesData(resp.data);
         setRoleLoading(false);
       }),
     );
-  }, [protect]);
+  }, [protect, roleFilters, path]);
 
   useImperativeHandle(
     ref,
@@ -69,6 +73,10 @@ const NodeView = forwardRef(({ path }, ref) => {
     fetchRoles();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    fetchRoles();
+  }, [fetchRoles]);
 
   useEffect(() => {
     fetchNodeDetail(path);
@@ -152,31 +160,51 @@ const NodeView = forwardRef(({ path }, ref) => {
             <List
               className="cls-role-list-view"
               header={
-                <Row>
+                <Row wrap={false}>
                   <Col flex="auto">
                     <div className="cls-common-title">角色成员</div>
                   </Col>
-                  <Col flex="100px">
-                    <Button type="primary" onClick={() => setRoleModalVisiable(true)}>
-                      新增角色
-                    </Button>
+                  <Col flex="300px">
+                    <Space>
+                      <Input.Search
+                        styles={{ width: '100%' }}
+                        placeholder="输入进行搜索角色"
+                        loading={roleLoading}
+                        onSearch={v => setRoleFilters(filters => ({ ...filters, search: v }))}
+                        enterButton
+                      />
+                      <Button type="primary" onClick={() => setRoleModalVisiable(true)}>
+                        新增角色
+                      </Button>
+                    </Space>
                   </Col>
                 </Row>
               }
-              grid={{ gutter: 10, column: 3 }}
+              grid={{ gutter: 10, xs: 1, md: 2, xl: 3 }}
               dataSource={rolesData.results}
               loading={roleLoading}
               renderItem={item => (
-                <List.Item>
+                <List.Item key={item.id}>
                   <RoleUser role={item} node={node} onRoleDelete={(data) => {
                     setRolesData(oldData => ({
-                      ...oldData,
+                      count: oldData.count - 1,
                       results: oldData.results.filter(row => row.id !== data.id),
                     }));
                   }}/>
                 </List.Item>
               )}
-              pagination={rolesData.count > LIST_PAGE_SIZE ? { pageSize: LIST_PAGE_SIZE } : false}
+              pagination={{
+                size: 'small',
+                total: rolesData.count,
+                showTotal: (total) => `总计: ${total}`,
+                current: roleFilters.page,
+                pageSize: roleFilters.page_size,
+                showSizeChanger: true,
+                pageSizeOptions: [50, 100, 500, 1000],
+                showQuickJumper: true,
+                // eslint-disable-next-line camelcase
+                onChange: (page, pageSize) => setRoleFilters(filters => ({ ...filters, page, page_size: pageSize }))
+              }}
             />
           </Spin>
         </div>

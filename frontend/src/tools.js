@@ -18,8 +18,6 @@ export const COMMON_FORM_COL_PROPS = {
 };
 
 export const COMMON_MODAL_PROPS = {
-  okText: '确认',
-  cancelText: '取消',
   width: '50%',
   destroyOnClose: true,
   maskClosable: true,

@@ -69,7 +69,7 @@ install: clean-build ## install the package to the active Python's site-packages
 	${PYTHON} setup.py install
 
 build-static: ## build frontend and copy to django_tree_perm static directory
-	# cd frontend && rm -rf build && npm run build && cd ..
+	cd frontend && rm -rf build && npm run build && cd ..
 	mkdir -p django_tree_perm/static/tree_perm
 	rsync -avc --delete --exclude="*.map" --exclude="*.LICENSE.txt" --exclude="asset-manifest.json" frontend/build/ django_tree_perm/static/tree_perm/
-	cp -f django_tree_perm/static/tree_perm/index.html django_tree_perm/templates/tree_perm/main.html
+	mv django_tree_perm/static/tree_perm/index.html django_tree_perm/templates/tree_perm/main.html

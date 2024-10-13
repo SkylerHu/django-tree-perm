@@ -95,18 +95,22 @@ const RoleUser = ({ role, node, onRoleDelete }) => {
   const [addUsersRef] = Form.useForm();
 
   const fetchRoleDetail = useCallback(() => {
-    setLoading(true);
     if (!role.id || !node.id) {
       setData({});
       return;
     }
+    if (role.user_set !== undefined) {
+      // 刚开始是准备在各个Role独占获取用户列表；后来因发现删除role或导致后面的role都会刷新，所以放到了最外层获取数据
+      return;
+    }
+    setLoading(true);
     requests.get(TreeApi.roleDetail(role.id, node.id)).then(
       protect(resp => {
         setData(resp.data);
         setLoading(false);
       }),
     );
-  }, [protect, role.id, node.id]);
+  }, [protect, role, node.id]);
 
   useEffect(() => {
     fetchRoleDetail();
