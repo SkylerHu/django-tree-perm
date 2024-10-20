@@ -1,15 +1,327 @@
 #!/usr/bin/env python
 # coding=utf-8
-from django.views import View
+from http import HTTPStatus
 
-from django.http import HttpResponse
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.contrib.auth import login, authenticate
 
-from django_tree_perm import utils
-from django_tree_perm.models import TreeNode
+from django_tree_perm.models import User, TreeNode, Role, NodeRole
+from django_tree_perm.models.utils import user_to_json
+from django_tree_perm.controller import TreeNodeManger, PermManager
+from django_tree_perm import exceptions
+
+from .base import (
+    BaseView,
+    BasePermissionView,
+    BaseModelSerializer,
+    BaseListModelMixin,
+    BaseCreateModelMixin,
+    BaseRetrieveModelMixin,
+    BaseUpdateModelMixin,
+    BaseDestoryModelMixin,
+)
 
 
-class TreeNodeView(View):
+def main_view(request):
+    return render(request, "tree_perm/main.html")
+
+
+class PermView(BaseView):
+
+    @classmethod
+    def gen_user_data(cls, request, user):
+        path = request.GET.get("path", None)
+        key_name = request.GET.get("key_name", None)
+        roles = request.GET.get("roles", None)
+        if roles:
+            roles = roles.split(",")
+
+        data = user_to_json(user)
+        # 是否具备树和角色的管理权限
+        data["tree_manager"] = PermManager.has_tree_perm(user)
+        # 是否具备结点管理权限
+        data["node_manager"] = PermManager.has_node_perm(user, path=path, key_name=key_name, can_manage=True)
+        # 是否有该结点角色权限
+        data["node_perm"] = PermManager.has_node_perm(user, path=path, key_name=key_name, roles=roles)
+        return data
 
     def get(self, request, *args, **kwargs):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return JsonResponse({"error": "Please log in."}, status=HTTPStatus.UNAUTHORIZED)
+
+        data = self.gen_user_data(request, user)
+        return JsonResponse({"user": data}, status=HTTPStatus.OK)
+
+    def post(self, request, *args, **kwargs):
+        """用户登录"""
+        data = self.parese_request_body(request)
+        username = data.get("username")
+        password = data.get("password")
+
+        user = authenticate(username=username, password=password)
+        if user:
+            login(request, user)
+            data = self.gen_user_data(request, user)
+            return JsonResponse({"user": data}, status=HTTPStatus.OK)
+        return JsonResponse({"error": "Wrong username or password."}, status=HTTPStatus.BAD_REQUEST)
+
+
+class TreeNodeView(BaseListModelMixin):
+
+    model = TreeNode
+    filter_fields = [
+        "name",
+        "disabled",
+        "is_key",
+        "parent_id",
+        "parent__path",
+        "path",
+        "depth",
+        "alias",
+        "alias__icontains",
+        "description",
+        "description__icontains",
+    ]
+    ordering = ["path"]
+
+    def filter_by_search(self, request, queryset):
+        search = request.GET.get("search", None)
+        user_id = request.GET.get("user_id", None)
+
+        if user_id:
+            # 找出用户有权限的结点
+            queryset = queryset.filter_by_perm(user_id)
+
+        if search:
+            # 根据name模糊搜索
+            queryset = queryset.search_nodes(search)
+
+        return queryset
+
+    def post(self, request, *args, **kwargs):
+        data = self.parese_request_body(request)
+        manager = TreeNodeManger.add_node(
+            name=data.get("name"),
+            alias=data.get("alias"),
+            description=data.get("description"),
+            parent_id=data.get("parent_id"),
+            parent_path=data.get("parent_path"),
+            is_key=bool(data.get("is_key", False)),
+            user=request.user,
+        )
+        return JsonResponse(manager.node.to_json(), status=HTTPStatus.CREATED)
+
+
+class TreeNodeEditView(BaseRetrieveModelMixin):
+
+    model = TreeNode
+    pk_field = "path"
+
+    def patch(self, request, *args, pk=None, **kwargs):
+        node = self.get_object(pk)
+
+        data = self.parese_request_body(request)
+        manager = TreeNodeManger(node=node, user=request.user)
+        manager.update_attrs(
+            name=data.get("name"),
+            alias=data.get("alias"),
+            description=data.get("description"),
+            parent_id=data.get("parent_id"),
+        )
+        return JsonResponse(manager.node.to_json(), status=HTTPStatus.OK)
+
+    def delete(self, request, *args, pk=None, **kwargs):
+        node = self.get_object(pk)
+
+        data = node.to_json()
+        manager = TreeNodeManger(node=node, user=request.user)
+        manager.remove()
+        return JsonResponse(data, status=HTTPStatus.NO_CONTENT)
+
+
+class TreeLazyLoadView(BasePermissionView):
+
+    def get(self, request, *args, **kwargs):
+        parent_id = request.GET.get("parent_id", None)
+        parent_path = request.GET.get("parent_path", None)
+
+        queryset = TreeNode.objects.filter(disabled=False)
+        if parent_id:
+            queryset = queryset.filter(parent_id=parent_id)
+        elif parent_path:
+            queryset = queryset.filter(parent__path=parent_path)
+        else:
+            # 若是不传递则返回根结点
+            queryset = queryset.filter(depth=1)
+
+        count = queryset.count()
+        results = [node.to_json(partial=True) for node in queryset]
+        return JsonResponse({"count": count, "results": results}, status=HTTPStatus.OK)
+
+
+class TreeLoadView(BasePermissionView):
+    def get(self, request, *args, **kwargs):
+        search = request.GET.get("search", None)
         path = request.GET.get("path", None)
-        return HttpResponse("Hello, World!")
+        depth = request.GET.get("depth", None)
+
+        queryset = TreeNode.objects.filter(disabled=False)
+        if depth:
+            queryset = queryset.filter(depth__lte=depth)
+        if path:
+            queryset = queryset.filter(path=path)
+        if search:
+            queryset = queryset.search_nodes(search)
+
+        count = queryset.count()
+        trace_to_root = any([search, path, depth])
+        data = TreeNodeManger.to_json_tree(queryset, trace_to_root=trace_to_root)
+
+        return JsonResponse({"count": count, "results": data}, status=HTTPStatus.OK)
+
+
+class UserListView(BaseListModelMixin):
+
+    model = User
+    filter_fields = ["username", "is_active"]
+    search_fields = ["username", "first_name", "last_name"]
+    ordering = ["username"]
+
+
+class UserDetailView(BaseRetrieveModelMixin):
+
+    model = User
+    pk_field = "username"
+
+
+def get_node_form_request(request):
+    node = None
+    key_name = request.GET.get("key_name", None)
+    node_id = request.GET.get("node_id", None)
+    path = request.GET.get("path", None)
+    node = TreeNodeManger.get_node_object(key_name=key_name, node_id=node_id, path=path)
+    return node
+
+
+class RoleSerializer(BaseModelSerializer):
+
+    def __init__(self, instance, many=False, context=None):
+        super().__init__(instance, many, context)
+        request = self.context.get("request")
+        self.context["node"] = get_node_form_request(request)
+
+    def to_representation(self, instance):
+        node = self.context.get("node")
+        data = instance.to_json(path=node.path if node else None)
+        return data
+
+
+class RoleView(BaseCreateModelMixin, BaseListModelMixin):
+
+    model = Role
+    filter_fields = ["name", "can_manage"]
+    search_fields = ["name", "alias"]
+    ordering = ["-can_manage", "id"]
+    disabled_paginator = True
+    serializer_class = RoleSerializer
+
+    def check_create_permission(self, request, **kwargs):
+        if not PermManager.has_tree_perm(request.user):
+            raise exceptions.PermDenyException("Only superuser is allowed to add new role.")
+
+
+class RoleEditView(BaseRetrieveModelMixin, BaseUpdateModelMixin, BaseDestoryModelMixin):
+
+    model = Role
+    pk_field = "name"
+    serializer_class = RoleSerializer
+
+    def check_object_permissions(self, request, obj, **kwargs):
+        if not PermManager.has_tree_perm(request.user):
+            raise exceptions.PermDenyException("Only superuser is allowed to operate roles.")
+
+    def delete(self, request, *args, pk=None, **kwargs):
+        instance = self.get_object(pk)
+        obj = instance.noderole_set.first()
+        if obj:
+            return JsonResponse(
+                {
+                    "error": f"角色存在关联的用户，例如结点：{obj.node.path} ，请先删除角色所有结点下的用户后再重试",
+                },
+                status=HTTPStatus.BAD_REQUEST,
+            )
+        return super().delete(request, *args, pk=pk, **kwargs)
+
+
+class NodeRoleView(BaseCreateModelMixin, BaseListModelMixin):
+
+    model = NodeRole
+    filter_fields = [
+        "node_id",
+        "node__path",
+        "node__path__in",
+        "role_id",
+        "role__name",
+        "role__name__in",
+        "user_id",
+        "user__username",
+        "user__username__in",
+    ]
+    search_fields = ["node__name"]
+
+    def get_queryset(self, request, **kwargs):
+        queryset = super().get_queryset(request, **kwargs)
+        return queryset.select_related("node", "user", "role")
+
+    def filter_queryset(self, request, **kwargs):
+        queryset = super().filter_queryset(request, **kwargs)
+        key_names = request.GET.get("key_names", None)
+        if key_names:
+            queryset = queryset.filter(node__is_key=True, node__name__in=key_names.split(","))
+        return queryset
+
+    def check_create_permission(self, request, data=None, **kwargs):
+        node_id = data.get("node_id")
+        node = TreeNode.objects.get(id=node_id)
+        if not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
+            raise exceptions.PermDenyException(f"No permission to manage role members for the path={node.path}")
+
+    def post(self, request, *args, **kwargs):
+        data = self.parese_request_body(request)
+        self.check_create_permission(request, data=data)
+        user_ids = data.pop("user_ids", None)
+        if request.content_type == "multipart/form-data":
+            user_ids = request.POST.getlist("user_ids")
+        if user_ids:
+            instances = []
+            for user_id in user_ids:
+                obj, created = NodeRole.objects.get_or_create(user_id=user_id, **data)
+                if created:
+                    instances.append(obj)
+            serializer = self.serializer_class(instances, many=True, context={"request": request})
+            return JsonResponse(
+                {
+                    "count": len(instances),
+                    "results": serializer.data,
+                },
+                status=HTTPStatus.CREATED,
+            )
+        else:
+            instance = NodeRole(**data)
+            instance.full_clean()
+            instance.save()
+            serializer = self.serializer_class(instance, context={"request": request})
+            return JsonResponse(serializer.data, status=HTTPStatus.CREATED)
+
+
+class NodeRoleEditView(BaseRetrieveModelMixin, BaseDestoryModelMixin):
+
+    model = NodeRole
+    pk_field = "name"
+
+    def check_object_permissions(self, request, obj, **kwargs):
+        node = obj.node
+        if not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
+            raise exceptions.PermDenyException(f"No permission to manage role members for the path={node.path}")

@@ -18,10 +18,13 @@
 - `requirements_dev.txt` 开发需要的环境
 - `requirements_test.txt` 跑测试用例需要的环境
 - `tests` 测试用例目录
-    - `app` 对应Django中的App模块，定义了数据库等
     - `conftest.py` pytest测试用例全局变量配置
     - `settings` Django settings配置，在pytest.ini中引用
-- `py_eunm` lib核心代码
+- `django_tree_perm` lib核心代码
+    - static `注意` 文件通过在外层根目录下执行 `make build-static` 由 frontend 项目代码构建生成
+    - templates
+- `example_project` 开发测试的demo项目
+- `frontend` 配套的前端管理项目
 - `MANIFEST.in` 打包相关-清单文件配置
 - `Makefile` 构建配置，可以执行`make help`查看具体命令
     - 定义了测试、打包、发版等很多命令
@@ -52,6 +55,7 @@ mkdocs serve  # 可以启动本地访问文档
 （以下命令都定义在了Makefile中了）
 
 - `make clean-build` 删除本地构建缓存目录：`*_tools.egg-info`和`dist`
+- `make build-static` 重新生成 `django_tree_perm/static` 中的静态文件
 - `python setup.py sdist bdist_wheel` 执行打包
 - `twine check dist/py*(.whl|.tar.gz)` 检查生成的文件是否符合pypi的要求
 - `twine upload -r pypi dist/py*(.whl|.tar.gz)` 上传包

@@ -1,6 +1,9 @@
-site_name: django-tree-perm
+site_name: django-tree-perm 树结点管理
 repo_url: https://github.com/SkylerHu/django-tree-perm
 docs_dir: .
+exclude_docs: |
+  frontend/*
+  */node_modules/*
 
 theme:
   name: readthedocs

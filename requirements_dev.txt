@@ -8,9 +8,10 @@ tox==4.15.0
 -r requirements_docs.txt
 
 redis
+mysqlclient==2.2.4
 -r requirements_test.txt
 
 # 打包需要
 setuptools==70.0.0
 wheel==0.43.0
-twine==5.1.0
+twine==5.0.0

@@ -1,6 +1,7 @@
 exclude: >
     (?x)^(
-        .*settings.*\.py|  # python settings
+        .*/migrations/.*|  # auto-generated code from third party project
+        .*/static/.*|  # static files
     )$
 default_language_version:
     python: python3.9
@@ -17,6 +18,7 @@ repos:
     -   id: check-docstring-first
     -   id: check-json
     -   id: check-added-large-files
+        args: ['--maxkb=1024']
     -   id: check-yaml
     -   id: debug-statements
     -   id: trailing-whitespace
@@ -35,3 +37,16 @@ repos:
       - id: commitizen
         stages: [commit-msg]
         additional_dependencies: [ MarkupSafe==2.0.1 ]
+-   repo: https://github.com/pre-commit/mirrors-eslint
+    rev: v7.22.0
+    hooks:
+    -   id: eslint
+        files: \.[jt]sx?$  # *.js, *.jsx, *.ts and *.tsx
+        types: [file]
+-   repo: https://github.com/awebdeveloper/pre-commit-stylelint
+    rev: 0.0.1
+    hooks:
+    -   id: stylelint
+        files: \.(css|less|scss|sass)$
+        types: [file]
+        additional_dependencies: ['stylelint@14.16.1', 'stylelint-config-standard@28.0.0']

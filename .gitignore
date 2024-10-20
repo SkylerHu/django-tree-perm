@@ -30,5 +30,3 @@ dist/
 .pytest_cache/
 .tox/
 .cache
-
-frontend/

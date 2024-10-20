@@ -20,7 +20,7 @@ class SettingsProxy(object):
     def __init__(self) -> None:
         _settings = None
         # 兼容在Django项目中的使用
-        _settings_module = os.environ.get("PY_SETTINGS_MODULE") or os.environ.get("DJANGO_SETTINGS_MODULE")
+        _settings_module = os.environ.get("DJANGO_SETTINGS_MODULE")
         try:
             if _settings_module:
                 _settings = importlib.import_module(_settings_module)
@@ -37,6 +37,8 @@ class SettingsProxy(object):
 
     # 是否调试模式
     DEBUG = False
+
+    TREE_DATETIME_FORMAT = "%Y-%m-%d %H:%M:%S"
 
     def __getattribute__(self, attr: str) -> typing.Any:
         try:

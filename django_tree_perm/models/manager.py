@@ -2,21 +2,47 @@
 # coding=utf-8
 from django.db import models
 
-from django_tree_perm import utils
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 
 
 class TreeNodeManager(models.Manager):
+    pass
 
-    def search_nodes(self, value=None):
+
+class TreeNodeQuerySet(models.QuerySet):
+    def search_nodes(self, value):
+        """模糊搜索树结点，尽快少的返回结点数据
+
+        - 若包含路径分隔符"."，则按照path搜索
+            - 优先按照 path startswith搜索
+            - 无结果继续 path contains查找
+            - 最终返回结果，仅返回 树深度depth 最浅的结点
+        - 按照 name 唯一标识搜索
+            - 优先搜索 is_key=True, name=value的结点，若存在忽略深度depth直接返回
+            - 若无继续搜索 is_key=True, name contains 的结点，若存在忽略深度depth直接返回
+            - 其次搜索 name contains 的结点，最终返回结果，仅返回 树深度depth 最浅的结点
+
+        Args:
+            value: _description_
+
+        Returns:
+            _description_
+        """
         # 搜索值为空，搜索无结果
-        queryset = self.filter(disabled=False)
-        if value is None:
-            return queryset
+        queryset = self
+        if not value:
+            return queryset.none()
+
         # 传的值是path路径
         if TREE_SPLIT_NODE_FLAG in value:
-            qs = queryset.filter(path__contains=value)
-            return qs
+            qs = queryset.filter(path=value)
+            if qs.exists():
+                return qs
+            qs = queryset.filter(path__startswith=value)
+            if not qs.exists():
+                qs = queryset.filter(path__contains=value)
+            return qs.limit_to_top_node()
+
         # 绝对叶子结点有值相等
         qs = queryset.filter(is_key=True, name=value)
         if qs.exists():
@@ -25,27 +51,51 @@ class TreeNodeManager(models.Manager):
         qs = queryset.filter(is_key=True, name__contains=value)
         if qs.exists():
             return qs
+
         # 根据name模糊搜索
         qs = queryset.filter(name__contains=value)
+        return qs.limit_to_top_node()
+
+    def limit_to_top_node(self):
+        """若是按照路径查找，尽可能返回更少的结点。
+        优先返回树结构中 深度depth 最浅的结点
+        """
+        qs = self
+        first = qs.order_by("depth").first()
+        if first:
+            qs = qs.filter(depth=first.depth)
+        else:
+            qs = qs.none()
         return qs
 
-    def search_keys(self, value=None):
-        queryset = self.filter(is_key=True, disabled=False)
-        queryset = queryset.search_nodes(value=value)
-        return queryset.order_by("name")
+    def search_keys(self, value):
+        """仅搜索关键结点(key node)"""
+        queryset = self.filter(is_key=True)
+        qs = queryset.filter(name=value)
+        if not qs.exists():
+            # 绝对叶子结点值有关联
+            qs = queryset.filter(name__contains=value)
+        return qs.order_by("name")
 
-    def filter_by_perm(self, user_id, role_ids=None):
-        queryset = self.filter(disabled=False)
+    def filter_by_perm(self, user_id, roles=None):
+        """根据用户和角色搜索相关联的结点
+
+        Args:
+            user_id: int, 用户ID
+            roles: list[str], 用户角色，有任意其中一个角色即可. Defaults to None, 不传递表示有任意角色即可.
+
+        Returns:
+            QuerySet
+        """
+        queryset = self
 
         # 找出自己有权限的路径
         from django_tree_perm.models import NodeRole
 
-        nr_qs = NodeRole.objects.filter(user_id=user_id, node__disabled=False)
-        if role_ids and len(role_ids) == 1:
-            nr_qs = nr_qs.filter(role_id=role_ids[0])
-        elif role_ids:
-            nr_qs = nr_qs.filter(role_id__in=role_ids)
-        paths = list(nr_qs.values("node__path").distinct())
+        nr_qs = NodeRole.objects.filter(user_id=user_id)
+        if roles:
+            nr_qs = nr_qs.filter(role__name__in=roles)
+        paths = list(nr_qs.values_list("node__path", flat=True).distinct())
         if not paths:
             return queryset.none()
 
@@ -55,38 +105,3 @@ class TreeNodeManager(models.Manager):
             query = query | models.Q(path__startswith=f"{path}{TREE_SPLIT_NODE_FLAG}")
         queryset = queryset.filter(query)
         return queryset
-
-    def to_json_tree(self):
-        """转换成树形结构的数据
-        尽量不要渲染整棵树，处理速度会很慢；
-        可以在调用之前多使用filter函数
-        """
-        queryset = self
-        if self.query.where:
-            paths = utils.get_tree_paths(list(self.values_list("path", flat=True)))
-            queryset = self.all().filter(path__in=paths)
-
-        tree = []
-        # 以parent_id为key, value是数组--存放直接子结点
-        parent_child_nodes = {}
-        for node in queryset:
-            if node.parent_id:
-                parent_child_nodes.setdefault(node.parent_id, [])
-                parent_child_nodes[node.parent_id].append(node.to_json())
-            else:
-                tree.append(node.to_json())
-
-        # 组装树形结构
-        leafs = tree
-        while True:
-            if not leafs:
-                break
-            new_leafs = []
-            for parent in leafs:
-                children = parent_child_nodes.get(parent["id"], [])
-                if children:
-                    parent["children"] = children
-                    new_leafs.extend(children)
-            leafs = new_leafs
-
-        return tree

@@ -1,0 +1,125 @@
+[
+  {
+    "name": "com",
+    "alias": "公司",
+    "description": "AppKey用于公司服务管理场景",
+    "children": [
+      {
+        "name": "dept1",
+        "alias": "部门1",
+        "description": "",
+        "is_key": false,
+        "children": [
+          {
+            "name": "product1",
+            "alias": "产品1",
+            "description": "",
+            "is_key": false
+          },
+          {
+            "name": "product2",
+            "alias": "产品2",
+            "description": "",
+            "is_key": false,
+            "children": [
+              {
+                "name": "system1",
+                "alias": "系统1",
+                "description": "",
+                "is_key": false,
+                "children": [
+                  {
+                    "name": "module",
+                    "alias": "模块",
+                    "description": "",
+                    "is_key": false,
+                    "children": [
+                      {
+                        "name": "appkey2",
+                        "alias": "服务2",
+                        "description": "",
+                        "is_key": true
+                      },
+                      {
+                        "name": "appkey3",
+                        "alias": "服务3",
+                        "description": "",
+                        "is_key": true
+                      }
+                    ]
+                  },
+                  {
+                    "name": "appkey1",
+                    "alias": "服务1",
+                    "description": "",
+                    "is_key": true
+                  }
+                ]
+              },
+              {
+                "name": "system2",
+                "alias": "系统2",
+                "description": "",
+                "is_key": false
+              }
+            ]
+          },
+          {
+            "name": "product3",
+            "alias": "产品3"
+          },
+          {
+            "name": "product4",
+            "alias": "产品4"
+          },
+          {
+            "name": "product4",
+            "alias": "产品4"
+          },
+          {
+            "name": "product5",
+            "alias": "产品5"
+          },
+          {
+            "name": "product6",
+            "alias": "产品6"
+          }
+        ]
+      },
+      {
+        "name": "dept2",
+        "alias": "部门2",
+        "description": "",
+        "is_key": false
+      }
+    ]
+  },
+  {
+    "name": "web",
+    "alias": "网页",
+    "description": "通过配置菜单、按钮控制系统相关页面和操作权限",
+    "children": [
+      {
+        "name": "system1",
+        "alias": "页面",
+        "children": [
+          {
+            "name": "button1",
+            "alias": "按钮1",
+            "is_key": true
+          },
+          {
+            "name": "button2",
+            "alias": "按钮2",
+            "is_key": true
+          },
+          {
+            "name": "div",
+            "alias": "区域展示",
+            "is_key": true
+          }
+        ]
+      }
+    ]
+  }
+]

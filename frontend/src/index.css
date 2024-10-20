@@ -1,0 +1,72 @@
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+html, body, #root {
+  height: 100%;
+  overflow: hidden;
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/** 通用样式 **/
+.cls-view-match-parent {
+  width: 100% !important;
+  height: 100% !important;
+}
+
+.cls-common-title {
+  color: #1f1f1f;
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.5;
+}
+/* 滚动组件处理 */
+.cls-scoll-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.cls-scoll-container-wrapper {
+  position: absolute;
+  display: flex;
+  align-items: stretch; /* 使子容器填满整个父容器的高度 */
+  width: 100%;
+  height: 100%;
+}
+
+.cls-scoll-container-content {
+  flex: 1; /* flex: 1 使子容器自动填充剩余空间 */
+  padding-bottom: 100px;
+  overflow: auto;
+}
+
+/** 服务树样式 **/
+.cls-tree-view {
+  margin-top: 10px;
+}
+
+.cls-tree-wrapper {
+  border: 2px solid #f5f7f9;
+}
+
+.cls-node-detail-container {
+  position: absolute;
+  overflow: auto;
+}
+
+.cls-role-list-view {
+  margin-top: 20px;
+}
+
+.cls-role-list-view .ant-list-header {
+  margin-bottom: 10px;
+}

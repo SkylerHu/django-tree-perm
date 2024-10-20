@@ -1,0 +1,68 @@
+{
+  "env": {
+    "browser": true,
+    "es6": true,
+    "node": true
+  },
+  "settings": {
+    "react": {
+      "pragma": "React",
+      "version": "detect"
+    }
+  },
+  "plugins": ["react", "react-hooks", "@typescript-eslint"],
+  "extends": ["eslint:recommended", "plugin:react/recommended", "plugin:@typescript-eslint/recommended"],
+  "parser": "@typescript-eslint/parser",
+  "rules": {
+    "no-caller": 2,
+    "no-undef": 2,
+    "no-unused-vars": 2,
+    "no-use-before-define": 0,
+    "object-curly-spacing": ["error", "always"],
+    "strict": 0,
+    "semi": 2,
+    "no-loop-func": 0,
+    "no-multi-spaces": "error",
+    "keyword-spacing": [
+      "error",
+      {
+        "before": true,
+        "after": true
+      }
+    ],
+    "quotes": [
+      "error",
+      "single",
+      {
+        "allowTemplateLiterals": true
+      }
+    ],
+    "indent": [
+      "error",
+      2,
+      {
+        "SwitchCase": 1
+      }
+    ],
+    "no-console": ["error"],
+    "camelcase": [
+      "error",
+      {
+        "properties": "always",
+        "ignoreDestructuring": false
+      }
+    ],
+    "@typescript-eslint/explicit-module-boundary-types": "off",
+    "react-hooks/rules-of-hooks": "error",
+    "react-hooks/exhaustive-deps": "error"
+  },
+  "ignorePatterns": ["dist/**/*"],
+  "overrides": [
+    {
+      "files": ["tests/**/*"],
+      "env": {
+        "jest": true
+      }
+    }
+  ]
+}
