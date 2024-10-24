@@ -236,6 +236,8 @@ def test_op_role(employee_client, admin_client, employee_user, dept_node):
     # 修改
     resp = employee_client.patch(f"/tree/roles/{role.id}/", data={"alias": "leader"}, content_type="application/json")
     assert resp.status_code == HTTPStatus.FORBIDDEN, resp.content
+    resp = admin_client.patch(f"/tree/roles/{role.id}/", data={"name": "test-not"}, content_type="application/json")
+    assert resp.status_code == HTTPStatus.BAD_REQUEST, resp.content
     resp = admin_client.patch(f"/tree/roles/{role.id}/", data={"alias": "leader"}, content_type="application/json")
     assert resp.status_code == HTTPStatus.OK
     role.refresh_from_db()
@@ -314,6 +316,26 @@ def test_node_role(admin_client, employee_client, django_user_model, dept_node, 
     # 不允许修改
     resp = employee_client.patch(f"/tree/noderoles/{node_role.id}/")
     assert resp.status_code == HTTPStatus.METHOD_NOT_ALLOWED, resp.content
+
+
+@pytest.mark.django_db()
+@pytest.mark.parametrize(
+    "params,code",
+    [
+        ({"path": "not-found"}, 400),
+        ({"role_name": "not-role"}, 400),
+        ({}, 201),
+    ],
+)
+def test_add_node_role(admin_client, params, code, dept_node, dev_role, employee_user):
+    data = {
+        "node_id": dept_node.id,
+        "role_id": dev_role.id,
+        "user_id": employee_user.id,
+    }
+    data.update(params)
+    resp = admin_client.post("/tree/noderoles/", data=data, content_type="application/json")
+    assert resp.status_code == code
 
 
 def test_common_view(client, admin_client, dev_role):

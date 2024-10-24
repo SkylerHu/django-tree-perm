@@ -146,7 +146,8 @@ class TreeNodeManger(object):
         if is_change:
             node.validate_save()
 
-        self.move_path(parent_id=parent_id, parent_path=parent_path)
+        if parent_id or parent_path:
+            self.move_path(parent_id=parent_id, parent_path=parent_path)
 
     @transaction.atomic
     def move_path(
