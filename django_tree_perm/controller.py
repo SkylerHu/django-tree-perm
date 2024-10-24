@@ -1,14 +1,17 @@
 #!/usr/bin/env python
 # coding=utf-8
+import typing
+
 import re
 
+from django.db import models
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.core.exceptions import ObjectDoesNotExist
 
 from django_tree_perm import utils
 from django_tree_perm import exceptions
-from django_tree_perm.models import TreeNode, NodeRole
+from django_tree_perm.models import User, TreeNode, NodeRole
 
 
 class TreeNodeManger(object):
@@ -16,34 +19,47 @@ class TreeNodeManger(object):
     树结点管理类
     """
 
-    def __init__(self, node=None, user=None, **kwargs):
+    def __init__(
+        self,
+        node: typing.Optional[TreeNode] = None,
+        user: typing.Optional[User] = None,
+        **kwargs: typing.Any,
+    ) -> None:
         """初始化
 
         Args:
-            node: TreeNode, 结点对象
-            user: User, 用户对象，传递该值后结点管理操作会校验权限
+            node: 结点对象
+            user: 用户对象，传递该值后结点管理操作会校验权限
             kwargs: node传递None时通过该参数获取结点
         """
         if not node and kwargs:
             node = get_object_or_404(TreeNode, **kwargs)
-        self.node = node
+        self.node = typing.cast(TreeNode, node)
         self.user = user
 
     @classmethod
     def add_node(
-        cls, name, alias="", description="", parent=None, parent_id=None, parent_path=None, is_key=False, user=None
-    ):
+        cls,
+        name: typing.Optional[str],
+        alias: str = "",
+        description: str = "",
+        parent: typing.Optional[TreeNode] = None,
+        parent_id: typing.Optional[int] = None,
+        parent_path: typing.Optional[str] = None,
+        is_key: bool = False,
+        user: typing.Optional[User] = None,
+    ) -> "TreeNodeManger":
         """新增树结点
 
         Args:
-            name: str, 结点唯一标识
-            alias: str, 别名. Defaults to "".
-            description: str, 简介描述. Defaults to "".
-            parent: TreeNode, 父类结点对象. Defaults to None.
-            parent_id: int, 父结点ID. Defaults to None.
-            parent_path: str, 父结点路径. Defaults to None.
-            is_key: bool, 是否作为Key, 为True时唯一标识name全局唯一. Defaults to False.
-            user: User, 操作用户对象. Defaults to None.
+            name: 结点唯一标识
+            alias: 别名
+            description: 简介描述
+            parent: 父类结点对象
+            parent_id: 父结点ID
+            parent_path: 父结点路径，无父类结点数据时，新增为根结点
+            is_key: bool, 是否作为Key, 为True时唯一标识name全局唯一
+            user: User, 操作用户对象
 
         Raises:
             exceptions.PermDenyException: 无权限时抛出的异常
@@ -84,14 +100,22 @@ class TreeNodeManger(object):
         return cls(node=node, user=user)
 
     @transaction.atomic
-    def update_attrs(self, name=None, alias=None, description=None, parent_id=None):
+    def update_attrs(
+        self,
+        name: typing.Optional[str] = None,
+        alias: typing.Optional[str] = None,
+        description: typing.Optional[str] = None,
+        parent_id: typing.Optional[int] = None,
+        parent_path: typing.Optional[str] = None,
+    ) -> None:
         """更新结点信息，参数不传递则表示不更新
 
         Args:
-            name: str, 唯一标识. Defaults to None.
-            alias: str, 别名. Defaults to None.
-            description: str, 简介. Defaults to None.
-            parent_id: int, 父类结点ID. Defaults to None.
+            name: 唯一标识
+            alias: 别名
+            description: 简介
+            parent_id: 父类结点ID
+            parent_path: 父类结点路径
 
         Raises:
             exceptions.PermDenyException: 无权限时抛出的异常
@@ -122,11 +146,15 @@ class TreeNodeManger(object):
         if is_change:
             node.validate_save()
 
-        if parent_id and node.parent_id != parent_id:
-            self.move_path(parent_id=parent_id)
+        self.move_path(parent_id=parent_id, parent_path=parent_path)
 
     @transaction.atomic
-    def move_path(self, parent=None, parent_id=None, parent_path=None):
+    def move_path(
+        self,
+        parent: typing.Optional[TreeNode] = None,
+        parent_id: typing.Optional[int] = None,
+        parent_path: typing.Optional[str] = None,
+    ) -> int:
         """更改结点的父类结点（即移动结点在树结构中的位置）
 
         - 会更新该结点下所有子结点的信息，主要是更新结点path属性；
@@ -134,9 +162,9 @@ class TreeNodeManger(object):
         - 可用于恢复 disabled=True 的结点
 
         Args:
-            parent: TreeNode, 父类结点. Defaults to None.
-            parent_id: int, 父类结点ID. Defaults to None.
-            parent_path: str, 父类结点路径. Defaults to None.
+            parent: 父类结点
+            parent_id: 父类结点ID
+            parent_path: 父类结点路径
 
         Raises:
             exceptions.PermDenyException: 无权限时抛出的异常
@@ -146,10 +174,12 @@ class TreeNodeManger(object):
             更新结点记录数量
         """
         parent = self.find_parent_node(parent=parent, parent_id=parent_id, parent_path=parent_path, required=True)
+        # 已要求不能为空
+        parent = typing.cast(TreeNode, parent)
         node = self.node
         # 校验权限
         if self.user and not PermManager.has_node_perm(self.user, path=node.path, can_manage=True):
-            raise exceptions.PermDenyException(f"No move permission for the path={parent.path}")
+            raise exceptions.PermDenyException(f"No move permission for the path={node.path}")
         if self.user and parent:
             if not PermManager.has_node_perm(self.user, path=parent.path, can_manage=True):
                 raise exceptions.PermDenyException(f"No move permission for the parent path={parent.path}")
@@ -176,20 +206,20 @@ class TreeNodeManger(object):
             for _node in nodes:
                 re_prefix = old_prefix.replace(".", "\\.")
                 _node.path = re.sub(rf"^{re_prefix}", new_prefix, _node.path, flags=0)
-                _node._patch_attrs()
+                _node.patch_attrs()
             TreeNode.objects.bulk_update(nodes, TreeNode.TREE_SPECIAL_FIELDS, batch_size=1000)
             rows += len(nodes)
         return rows
 
     @transaction.atomic
-    def remove(self, clear_chidren=False):
+    def remove(self, clear_chidren: bool = False) -> int:
         """删除结点
 
         - 普通结点，直接删除数据库记录；
         - is_key=True 的结点，不允许删除数据库记录，删除操作仅将 disabled 置为 True
 
         Args:
-            clear_chidren: bool, 是否允许连带删除所有子结点. Defaults to False, 此时若有子结点不允许被删除.
+            clear_chidren: 是否允许连带删除所有子结点. 若为False则有子结点不允许被删除.
 
         Raises:
             exceptions.PermDenyException: 无权限时抛出的异常
@@ -233,7 +263,7 @@ class TreeNodeManger(object):
         for _node in query_set.filter(is_key=True, disabled=False):
             _node.disabled = True
             _node.parent = None
-            _node._patch_attrs()
+            _node.patch_attrs()
             nodes.append(_node)
             node_ids.append(_node.id)
         if nodes:
@@ -246,17 +276,22 @@ class TreeNodeManger(object):
         return row
 
     @classmethod
-    def find_parent_node(cls, parent=None, parent_id=None, parent_path=None, required=False):
+    def find_parent_node(
+        cls,
+        parent: typing.Optional[TreeNode] = None,
+        parent_id: typing.Optional[int] = None,
+        parent_path: typing.Optional[str] = None,
+        required: bool = False,
+    ) -> typing.Optional[TreeNode]:
         """根据参初始化父类结点，并判断结点是否能够作为父类结点
 
         Args:
-            parent: TreeNode, 父类结点. Defaults to None.
-            parent_id: int, 父类结点ID. Defaults to None.
-            parent_path: str, 父类结点路径. Defaults to None.
-            required: bool, 初始化后父类结点是否允许为空. Defaults to False.
+            parent: 父类结点
+            parent_id: 父类结点ID
+            parent_path: 父类结点路径
+            required: 初始化后父类结点是否允许为空
 
         Raises:
-            exceptions.PermDenyException: 无权限时抛出的异常
             exceptions.ParamsValidateException: 结点数据校验异常
 
         Returns:
@@ -269,18 +304,24 @@ class TreeNodeManger(object):
         return parent
 
     @classmethod
-    def get_node_object(cls, node=None, node_id=None, key_name=None, path=None, required=False):
+    def get_node_object(
+        cls,
+        node: typing.Optional[TreeNode] = None,
+        node_id: typing.Optional[int] = None,
+        key_name: typing.Optional[str] = None,
+        path: typing.Optional[str] = None,
+        required: bool = False,
+    ) -> typing.Optional[TreeNode]:
         """获取结点对象
 
         Args:
-            node: TreeNode, 结点对象. Defaults to None.
+            node: 结点对象. Defaults to None.
             node_id: int, 结点ID. Defaults to None.
             key_name: str，is_key=True情况下的结点唯一标识. Defaults to None.
             path: str, 结点路径. Defaults to None.
             required: bool, 初始化后父类结点是否允许为空. Defaults to False.
 
         Raises:
-            exceptions.PermDenyException: 无权限时抛出的异常
             exceptions.ParamsValidateException: 结点数据校验异常
 
         Returns:
@@ -306,17 +347,17 @@ class TreeNodeManger(object):
         return node
 
     @classmethod
-    def load_tree_data(cls, data):
+    def load_tree_data(cls, data: typing.List[dict]) -> int:
         """加载JSON树结构数据写入数据库中
 
         Args:
-            data: list 树结构数据
+            data: 树结构数据
 
         Returns:
-            int 新增结点个数
+            新增结点个数
         """
 
-        def _save_nodes(items, parent=None):
+        def _save_nodes(items: typing.List, parent: typing.Optional[TreeNode] = None) -> int:
             count = 0
             for item in items:
                 # 提取子结点数据
@@ -339,7 +380,7 @@ class TreeNodeManger(object):
         return total
 
     @classmethod
-    def to_json_tree(cls, queryset, trace_to_root=True):
+    def to_json_tree(cls, queryset: models.QuerySet, trace_to_root: bool = True) -> typing.List[dict]:
         """将查询的结点对象，转换成树型结构json数据；需追溯到根结点用于树型结构展示
 
         Args:
@@ -355,7 +396,7 @@ class TreeNodeManger(object):
 
         tree = []
         # 以parent_id为key, value是数组--存放直接子结点
-        parent_child_nodes = {}
+        parent_child_nodes: dict = {}
         for node in queryset:
             if node.parent_id:
                 parent_child_nodes.setdefault(node.parent_id, [])
@@ -383,7 +424,7 @@ class PermManager(object):
     """权限管理"""
 
     @classmethod
-    def has_tree_perm(cls, user):
+    def has_tree_perm(cls, user: typing.Optional[User]) -> bool:
         """判断是否有树的管理权限; 仅 is_active 且 is_superuser 用户有关联权限
 
         - 操作新增根结点；
@@ -391,31 +432,38 @@ class PermManager(object):
         - 对角色进行增删改查；
 
         Args:
-            user: User, 用户
+            user: 用户
 
         Returns:
-            bool, 有无权限
+            有无权限
         """
         if user and user.is_active and user.is_superuser:
             return True
         return False
 
     @classmethod
-    def has_node_perm(cls, user, path=None, key_name=None, roles=None, can_manage=False):
+    def has_node_perm(
+        cls,
+        user: typing.Optional[User],
+        path: typing.Optional[str] = None,
+        key_name: typing.Optional[str] = None,
+        roles: typing.Optional[typing.List[str]] = None,
+        can_manage: bool = False,
+    ) -> bool:
         """是否有某个结点的权限
 
         - 主要用于其他系统调用，判断用户是否有某key node的权限；
         - 结点的管理权限判断，需传递参数 can_manage=True；
 
         Args:
-            user: User, 用户
-            path: str, 结点路径
-            key_name: str, key结点的标识
-            roles: list[str], 有限定角色的权限，有任意其中一种角色便是有权限. Defaults to None, 不传递表示系统中任意角色都可行.
-            can_manage: 是否有管理结点的权限. Defaults to False.
+            user: 用户
+            path: 结点路径
+            key_name: key结点的标识
+            roles: 有限定角色的权限，有任意其中一种角色便是有权限. 不传递表示系统中任意角色都可行.
+            can_manage: 是否有管理结点的权限
 
         Returns:
-            bool, 有无权限
+            有无权限
         """
         if cls.has_tree_perm(user):
             # 有树结点权限，则所有结点均有权限

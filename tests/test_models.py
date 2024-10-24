@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 
 from django_tree_perm.models import NodeRole, TreeNode, Role
 from django_tree_perm.models.utils import user_to_json, format_dict_to_json
-from django_tree_perm.models.tree import _validator
+from django_tree_perm.models.tree import tree_validator
 from django_tree_perm.models.manager import TreeNodeManager, TreeNodeQuerySet
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 
@@ -26,10 +26,10 @@ from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 )
 def test_name_validator(value, success):
     if success:
-        _validator()(value)
+        tree_validator()(value)
     else:
         with pytest.raises(ValidationError):
-            _validator()(value)
+            tree_validator()(value)
 
 
 @pytest.mark.django_db()

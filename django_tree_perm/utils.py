@@ -1,5 +1,13 @@
 #!/usr/bin/env python
 # coding=utf-8
+"""
+工具模块
+
+- `TREE_SPLIT_NODE_FLAG` 定义树结点拼接path路径的分隔符
+- `SAFE_METHODS` 定义接口只读权限的 method
+
+"""
+import typing
 import bisect
 
 
@@ -10,16 +18,16 @@ TREE_SPLIT_NODE_FLAG = "."
 SAFE_METHODS = ("GET", "HEAD", "OPTIONS")
 
 
-def get_tree_paths(paths):
+def get_tree_paths(paths: typing.Union[str, typing.List[str]]) -> typing.List[str]:
     """根据path获取所有父类路径
 
     例如 "a.b.c" 返回 ["a", "a.b", "a.b.c"]
 
     Args:
-        paths: str or list[str], 输入树结点路径
+        paths: 输入树结点路径
 
     Returns:
-        list，返回路径及其所有父类路径
+        返回路径及其所有父类路径
     """
     if not paths:
         return []
@@ -27,7 +35,7 @@ def get_tree_paths(paths):
     if isinstance(paths, str):
         paths = [paths]
 
-    results = []
+    results: typing.List[str] = []
     for _path in paths:
         path = None
         for name in _path.split(TREE_SPLIT_NODE_FLAG):
@@ -41,14 +49,14 @@ def get_tree_paths(paths):
     return results
 
 
-def get_path_parent(path):
+def get_path_parent(path: str) -> str:
     """获取树结点路径的直接父类路径
 
     Args:
-        path: str 树结点路径，eg: a.b.c
+        path: 树结点路径，eg: a.b.c
 
     Returns:
-        str, 直接父类路径，eg: a.b
+        直接父类路径，eg: a.b
     """
     if not path:
         return ""

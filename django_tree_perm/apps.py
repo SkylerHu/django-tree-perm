@@ -7,5 +7,5 @@ from django.apps import AppConfig
 class MrbacConfig(AppConfig):
     name = "django_tree_perm"
 
-    def ready(self):
+    def ready(self) -> None:
         pass

@@ -11,7 +11,10 @@ theme:
 
 nav:
   - 首页: README.md
-  - 使用(Usage): docs/Reference.md
+  - 使用(Usage):
+    - 数据库Model: docs/ModelDoc.md
+    - 接口API: docs/API.md
+    - 工具类: docs/Utils.md
   - Release Notes: docs/CHANGELOG-1.x.md
   - 贡献者指南: docs/CONTRIBUTING.md
 

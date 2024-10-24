@@ -22,11 +22,6 @@ repos:
     -   id: check-yaml
     -   id: debug-statements
     -   id: trailing-whitespace
--   repo: https://github.com/pycqa/flake8
-    rev: 3.8.3
-    hooks:
-    -   id: flake8
-        args: ['--max-line-length', '120']
 -   repo: https://github.com/pre-commit/pre-commit.git
     rev: v2.6.0
     hooks:
@@ -37,6 +32,18 @@ repos:
       - id: commitizen
         stages: [commit-msg]
         additional_dependencies: [ MarkupSafe==2.0.1 ]
+-   repo: https://github.com/pre-commit/mirrors-mypy
+    rev: 'v1.9.0'  # Use the sha / tag you want to point at
+    hooks:
+    -   id: mypy
+        args: ['--disallow-untyped-defs', '--ignore-missing-imports']
+        additional_dependencies: [tokenize-rt==3.2.0]
+        exclude: "tests"
+-   repo: https://github.com/pycqa/flake8
+    rev: 3.8.3
+    hooks:
+    -   id: flake8
+        args: ['--max-line-length', '120']
 -   repo: https://github.com/pre-commit/mirrors-eslint
     rev: v7.22.0
     hooks:

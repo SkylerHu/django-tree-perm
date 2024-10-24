@@ -1,16 +1,22 @@
 #!/usr/bin/env python
 # coding=utf-8
+import typing
+
 from django.db import models
 
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 
 
 class TreeNodeManager(models.Manager):
+    """用于TreeNode objects管理"""
+
     pass
 
 
 class TreeNodeQuerySet(models.QuerySet):
-    def search_nodes(self, value):
+    """用于TreeNode扩展QuerySet查询方法"""
+
+    def search_nodes(self, value: str) -> "TreeNodeQuerySet":
         """模糊搜索树结点，尽快少的返回结点数据
 
         - 若包含路径分隔符"."，则按照path搜索
@@ -23,10 +29,10 @@ class TreeNodeQuerySet(models.QuerySet):
             - 其次搜索 name contains 的结点，最终返回结果，仅返回 树深度depth 最浅的结点
 
         Args:
-            value: _description_
+            value: 搜索输入值
 
         Returns:
-            _description_
+            TreeNodeQuerySet
         """
         # 搜索值为空，搜索无结果
         queryset = self
@@ -56,9 +62,13 @@ class TreeNodeQuerySet(models.QuerySet):
         qs = queryset.filter(name__contains=value)
         return qs.limit_to_top_node()
 
-    def limit_to_top_node(self):
+    def limit_to_top_node(self) -> "TreeNodeQuerySet":
         """若是按照路径查找，尽可能返回更少的结点。
+
         优先返回树结构中 深度depth 最浅的结点
+
+        Returns:
+            TreeNodeQuerySet
         """
         qs = self
         first = qs.order_by("depth").first()
@@ -68,8 +78,15 @@ class TreeNodeQuerySet(models.QuerySet):
             qs = qs.none()
         return qs
 
-    def search_keys(self, value):
-        """仅搜索关键结点(key node)"""
+    def search_keys(self, value: str) -> "TreeNodeQuerySet":
+        """仅搜索关键结点(key node)
+
+        Args:
+            value: 搜索输入值
+
+        Returns:
+            TreeNodeQuerySet
+        """
         queryset = self.filter(is_key=True)
         qs = queryset.filter(name=value)
         if not qs.exists():
@@ -77,15 +94,15 @@ class TreeNodeQuerySet(models.QuerySet):
             qs = queryset.filter(name__contains=value)
         return qs.order_by("name")
 
-    def filter_by_perm(self, user_id, roles=None):
+    def filter_by_perm(self, user_id: int, roles: typing.Optional[typing.List[str]] = None) -> "TreeNodeQuerySet":
         """根据用户和角色搜索相关联的结点
 
         Args:
-            user_id: int, 用户ID
-            roles: list[str], 用户角色，有任意其中一个角色即可. Defaults to None, 不传递表示有任意角色即可.
+            user_id: 用户ID
+            roles: 用户角色，有任意其中一个角色即可，不传递表示有任意角色即可.
 
         Returns:
-            QuerySet
+            TreeNodeQuerySet
         """
         queryset = self
 

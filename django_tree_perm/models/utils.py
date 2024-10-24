@@ -3,10 +3,16 @@
 import datetime
 
 from django_tree_perm import settings
+from django.contrib.auth.models import AbstractUser
 from django.forms.models import model_to_dict
 
+from django.contrib.auth import get_user_model
 
-def format_dict_to_json(data):
+
+User = get_user_model()
+
+
+def format_dict_to_json(data: dict) -> None:
     for k, v in data.items():
         if isinstance(v, (int, float, bool, str)):
             continue
@@ -16,7 +22,7 @@ def format_dict_to_json(data):
             data[k] = str(v)
 
 
-def user_to_json(user):
+def user_to_json(user: AbstractUser) -> dict:
     """user对象转换成json数据"""
     data = model_to_dict(
         user,

@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 # coding=utf-8
+import typing
 from http import HTTPStatus
 
-from django.http import JsonResponse
+from django.db import models
+from django.http import JsonResponse, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.contrib.auth import login, authenticate
 
@@ -23,14 +25,17 @@ from .base import (
 )
 
 
-def main_view(request):
+def main_view(request: HttpRequest) -> HttpResponse:
+    """
+    前端管理页面的入口
+    """
     return render(request, "tree_perm/main.html")
 
 
 class PermView(BaseView):
 
     @classmethod
-    def gen_user_data(cls, request, user):
+    def gen_user_data(cls, request: HttpRequest, user: User) -> dict:
         path = request.GET.get("path", None)
         key_name = request.GET.get("key_name", None)
         roles = request.GET.get("roles", None)
@@ -46,7 +51,7 @@ class PermView(BaseView):
         data["node_perm"] = PermManager.has_node_perm(user, path=path, key_name=key_name, roles=roles)
         return data
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         user = request.user
         if not user or not user.is_authenticated:
             return JsonResponse({"error": "Please log in."}, status=HTTPStatus.UNAUTHORIZED)
@@ -54,7 +59,7 @@ class PermView(BaseView):
         data = self.gen_user_data(request, user)
         return JsonResponse({"user": data}, status=HTTPStatus.OK)
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         """用户登录"""
         data = self.parese_request_body(request)
         username = data.get("username")
@@ -81,12 +86,11 @@ class TreeNodeView(BaseListModelMixin):
         "depth",
         "alias",
         "alias__icontains",
-        "description",
         "description__icontains",
     ]
     ordering = ["path"]
 
-    def filter_by_search(self, request, queryset):
+    def filter_by_search(self, request: HttpRequest, queryset: models.QuerySet) -> models.QuerySet:
         search = request.GET.get("search", None)
         user_id = request.GET.get("user_id", None)
 
@@ -100,12 +104,12 @@ class TreeNodeView(BaseListModelMixin):
 
         return queryset
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         data = self.parese_request_body(request)
         manager = TreeNodeManger.add_node(
             name=data.get("name"),
-            alias=data.get("alias"),
-            description=data.get("description"),
+            alias=data.get("alias") or "",
+            description=data.get("description") or "",
             parent_id=data.get("parent_id"),
             parent_path=data.get("parent_path"),
             is_key=bool(data.get("is_key", False)),
@@ -119,7 +123,13 @@ class TreeNodeEditView(BaseRetrieveModelMixin):
     model = TreeNode
     pk_field = "path"
 
-    def patch(self, request, *args, pk=None, **kwargs):
+    def patch(
+        self,
+        request: HttpRequest,
+        *args: typing.Any,
+        pk: typing.Optional[str] = None,
+        **kwargs: typing.Any,
+    ) -> JsonResponse:
         node = self.get_object(pk)
 
         data = self.parese_request_body(request)
@@ -129,10 +139,17 @@ class TreeNodeEditView(BaseRetrieveModelMixin):
             alias=data.get("alias"),
             description=data.get("description"),
             parent_id=data.get("parent_id"),
+            parent_path=data.get("parent_path"),
         )
         return JsonResponse(manager.node.to_json(), status=HTTPStatus.OK)
 
-    def delete(self, request, *args, pk=None, **kwargs):
+    def delete(
+        self,
+        request: HttpRequest,
+        *args: typing.Any,
+        pk: typing.Optional[str] = None,
+        **kwargs: typing.Any,
+    ) -> JsonResponse:
         node = self.get_object(pk)
 
         data = node.to_json()
@@ -143,7 +160,7 @@ class TreeNodeEditView(BaseRetrieveModelMixin):
 
 class TreeLazyLoadView(BasePermissionView):
 
-    def get(self, request, *args, **kwargs):
+    def get(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         parent_id = request.GET.get("parent_id", None)
         parent_path = request.GET.get("parent_path", None)
 
@@ -162,7 +179,7 @@ class TreeLazyLoadView(BasePermissionView):
 
 
 class TreeLoadView(BasePermissionView):
-    def get(self, request, *args, **kwargs):
+    def get(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         search = request.GET.get("search", None)
         path = request.GET.get("path", None)
         depth = request.GET.get("depth", None)
@@ -196,7 +213,7 @@ class UserDetailView(BaseRetrieveModelMixin):
     pk_field = "username"
 
 
-def get_node_form_request(request):
+def get_node_form_request(request: HttpRequest) -> typing.Optional[TreeNode]:
     node = None
     key_name = request.GET.get("key_name", None)
     node_id = request.GET.get("node_id", None)
@@ -207,12 +224,12 @@ def get_node_form_request(request):
 
 class RoleSerializer(BaseModelSerializer):
 
-    def __init__(self, instance, many=False, context=None):
+    def __init__(self, instance: Role, many: bool = False, context: typing.Optional[dict] = None) -> None:
         super().__init__(instance, many, context)
         request = self.context.get("request")
         self.context["node"] = get_node_form_request(request)
 
-    def to_representation(self, instance):
+    def to_representation(self, instance: Role) -> dict:
         node = self.context.get("node")
         data = instance.to_json(path=node.path if node else None)
         return data
@@ -227,7 +244,7 @@ class RoleView(BaseCreateModelMixin, BaseListModelMixin):
     disabled_paginator = True
     serializer_class = RoleSerializer
 
-    def check_create_permission(self, request, **kwargs):
+    def check_create_permission(self, request: HttpRequest, **kwargs: typing.Any) -> None:
         if not PermManager.has_tree_perm(request.user):
             raise exceptions.PermDenyException("Only superuser is allowed to add new role.")
 
@@ -238,11 +255,26 @@ class RoleEditView(BaseRetrieveModelMixin, BaseUpdateModelMixin, BaseDestoryMode
     pk_field = "name"
     serializer_class = RoleSerializer
 
-    def check_object_permissions(self, request, obj, **kwargs):
+    def check_object_permissions(
+        self, request: HttpRequest, obj: Role, data: typing.Optional[dict] = None, **kwargs: typing.Any
+    ) -> None:
         if not PermManager.has_tree_perm(request.user):
             raise exceptions.PermDenyException("Only superuser is allowed to operate roles.")
 
-    def delete(self, request, *args, pk=None, **kwargs):
+        if request.method != "PATCH":
+            return
+
+        name = data.get("name", None) if data else None
+        if name and obj.name != name:
+            raise exceptions.ParamsValidateException("The role name is used for permission, cannot be modified.")
+
+    def delete(
+        self,
+        request: HttpRequest,
+        *args: typing.Any,
+        pk: typing.Optional[str] = None,
+        **kwargs: typing.Any,
+    ) -> JsonResponse:
         instance = self.get_object(pk)
         obj = instance.noderole_set.first()
         if obj:
@@ -269,35 +301,59 @@ class NodeRoleView(BaseCreateModelMixin, BaseListModelMixin):
         "user__username",
         "user__username__in",
     ]
-    search_fields = ["node__name"]
+    search_fields = ["node__path"]
 
-    def get_queryset(self, request, **kwargs):
+    def get_queryset(self, request: HttpRequest, **kwargs: typing.Any) -> models.QuerySet:
         queryset = super().get_queryset(request, **kwargs)
         return queryset.select_related("node", "user", "role")
 
-    def filter_queryset(self, request, **kwargs):
+    def filter_queryset(self, request: HttpRequest, **kwargs: typing.Any) -> models.QuerySet:
         queryset = super().filter_queryset(request, **kwargs)
         key_names = request.GET.get("key_names", None)
         if key_names:
             queryset = queryset.filter(node__is_key=True, node__name__in=key_names.split(","))
         return queryset
 
-    def check_create_permission(self, request, data=None, **kwargs):
-        node_id = data.get("node_id")
+    def check_create_permission(
+        self, request: HttpRequest, data: typing.Optional[dict] = None, **kwargs: typing.Any
+    ) -> None:
+        node_id = data.get("node_id") if data else None
         node = TreeNode.objects.get(id=node_id)
         if not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
             raise exceptions.PermDenyException(f"No permission to manage role members for the path={node.path}")
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         data = self.parese_request_body(request)
         self.check_create_permission(request, data=data)
+        path = data.get("path", "")
+        node_id = data.get("node_id", "")
+
+        try:
+            if path:
+                node = TreeNode.objects.get(path=path)
+            else:
+                node = TreeNode.objects.get(id=node_id)
+        except Exception as e:
+            raise exceptions.ParamsValidateException(f"node_id={node_id} or path={path} not exists {e}")
+
+        role_id = data.get("role_id", "")
+        role_name = data.get("role_name", "")
+        try:
+            if role_name:
+                role = Role.objects.get(name=role_name)
+            else:
+                role = Role.objects.get(id=role_id)
+        except Exception as e:
+            raise exceptions.ParamsValidateException(f"role_id={role_id} or role_name={role_name} not exists {e}")
+
         user_ids = data.pop("user_ids", None)
         if request.content_type == "multipart/form-data":
             user_ids = request.POST.getlist("user_ids")
+
         if user_ids:
             instances = []
             for user_id in user_ids:
-                obj, created = NodeRole.objects.get_or_create(user_id=user_id, **data)
+                obj, created = NodeRole.objects.get_or_create(user_id=user_id, node=node, role=role)
                 if created:
                     instances.append(obj)
             serializer = self.serializer_class(instances, many=True, context={"request": request})
@@ -309,7 +365,7 @@ class NodeRoleView(BaseCreateModelMixin, BaseListModelMixin):
                 status=HTTPStatus.CREATED,
             )
         else:
-            instance = NodeRole(**data)
+            instance = NodeRole(user_id=data.get("user_id"), node=node, role=role)
             instance.full_clean()
             instance.save()
             serializer = self.serializer_class(instance, context={"request": request})
@@ -321,7 +377,7 @@ class NodeRoleEditView(BaseRetrieveModelMixin, BaseDestoryModelMixin):
     model = NodeRole
     pk_field = "name"
 
-    def check_object_permissions(self, request, obj, **kwargs):
+    def check_object_permissions(self, request: HttpRequest, obj: NodeRole, **kwargs: typing.Any) -> None:
         node = obj.node
         if not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
             raise exceptions.PermDenyException(f"No permission to manage role members for the path={node.path}")
