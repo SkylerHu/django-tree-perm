@@ -19,4 +19,11 @@ jobs:
         with:
           python-version: "3.9"
 
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '16'
+
+      - name: Install dependencies
+        run: cd frontend && npm install . && cd ../
+
       - uses: pre-commit/action@v3.0.1

@@ -329,8 +329,8 @@ def test_node_role(admin_client, employee_client, django_user_model, dept_node, 
 )
 def test_add_node_role(admin_client, params, code, dept_node, dev_role, employee_user):
     data = {
-        "node_id": dept_node.id,
-        "role_id": dev_role.id,
+        "path": dept_node.path,
+        "role_name": dev_role.name,
         "user_id": employee_user.id,
     }
     data.update(params)

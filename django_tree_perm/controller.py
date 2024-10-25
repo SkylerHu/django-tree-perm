@@ -312,6 +312,7 @@ class TreeNodeManger(object):
         key_name: typing.Optional[str] = None,
         path: typing.Optional[str] = None,
         required: bool = False,
+        **kwargs: typing.Any,
     ) -> typing.Optional[TreeNode]:
         """获取结点对象
 

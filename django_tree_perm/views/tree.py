@@ -213,21 +213,14 @@ class UserDetailView(BaseRetrieveModelMixin):
     pk_field = "username"
 
 
-def get_node_form_request(request: HttpRequest) -> typing.Optional[TreeNode]:
-    node = None
-    key_name = request.GET.get("key_name", None)
-    node_id = request.GET.get("node_id", None)
-    path = request.GET.get("path", None)
-    node = TreeNodeManger.get_node_object(key_name=key_name, node_id=node_id, path=path)
-    return node
-
-
 class RoleSerializer(BaseModelSerializer):
 
     def __init__(self, instance: Role, many: bool = False, context: typing.Optional[dict] = None) -> None:
         super().__init__(instance, many, context)
         request = self.context.get("request")
-        self.context["node"] = get_node_form_request(request)
+        if request:
+            node = TreeNodeManger.get_node_object(**request.GET.dict())
+            self.context["node"] = node
 
     def to_representation(self, instance: Role) -> dict:
         node = self.context.get("node")
@@ -317,24 +310,15 @@ class NodeRoleView(BaseCreateModelMixin, BaseListModelMixin):
     def check_create_permission(
         self, request: HttpRequest, data: typing.Optional[dict] = None, **kwargs: typing.Any
     ) -> None:
-        node_id = data.get("node_id") if data else None
-        node = TreeNode.objects.get(id=node_id)
-        if not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
+        node = TreeNodeManger.get_node_object(required=True, **(data or {}))
+        if node and not PermManager.has_node_perm(request.user, path=node.path, can_manage=True):
             raise exceptions.PermDenyException(f"No permission to manage role members for the path={node.path}")
 
     def post(self, request: HttpRequest, *args: typing.Any, **kwargs: typing.Any) -> JsonResponse:
         data = self.parese_request_body(request)
         self.check_create_permission(request, data=data)
-        path = data.get("path", "")
-        node_id = data.get("node_id", "")
 
-        try:
-            if path:
-                node = TreeNode.objects.get(path=path)
-            else:
-                node = TreeNode.objects.get(id=node_id)
-        except Exception as e:
-            raise exceptions.ParamsValidateException(f"node_id={node_id} or path={path} not exists {e}")
+        node = TreeNodeManger.get_node_object(required=True, **data)
 
         role_id = data.get("role_id", "")
         role_name = data.get("role_name", "")

@@ -19,6 +19,9 @@ django-tree-perm 是 Django 实现的，提供了树形数据结构结点管理�
 - CMDB 服务树的管理；
 - web 项目页面权限的管理控制；
 
+
+具体使用说明可以查看 [readthedocs](https://django-tree-perm.readthedocs.io) 或者直接查看源码注释。
+
 ## 1. 安装
 
     pip install django-tree-perm
@@ -52,10 +55,6 @@ python manage.py migrate django_tree_perm
 
 可通过浏览器访问展示及管理页面 `http://localhost:8000/tree/`
 
-## 3. 介绍
-
-具体使用说明可以查看 [readthedocs](https://django-tree-perm.readthedocs.io) 或者直接查看源码注释。
-
-## 4. Demo 示例
+## 3. Demo 示例
 
 ![](./docs/statics/demo.gif)
