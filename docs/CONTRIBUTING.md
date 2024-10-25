@@ -57,6 +57,6 @@ mkdocs serve  # 可以启动本地访问文档
 - `make clean-build` 删除本地构建缓存目录：`*_tools.egg-info`和`dist`
 - `make build-static` 重新生成 `django_tree_perm/static` 中的静态文件
 - `python setup.py sdist bdist_wheel` 执行打包
-- `twine check dist/py*(.whl|.tar.gz)` 检查生成的文件是否符合pypi的要求
-- `twine upload -r pypi dist/py*(.whl|.tar.gz)` 上传包
+- `twine check dist/*(.whl|.tar.gz)` 检查生成的文件是否符合pypi的要求
+- `twine upload -r pypi dist/*(.whl|.tar.gz)` 上传包
     - 需要本地`~/.pypirc`配置用户名密码
