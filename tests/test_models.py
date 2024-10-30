@@ -9,6 +9,7 @@ from django_tree_perm.models import NodeRole, TreeNode, Role
 from django_tree_perm.models.utils import user_to_json, format_dict_to_json
 from django_tree_perm.models.tree import tree_validator
 from django_tree_perm.models.manager import TreeNodeManager, TreeNodeQuerySet
+from django_tree_perm.views.tree import RoleSerializer
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG
 
 
@@ -98,6 +99,12 @@ def test_node_role_model(dev_role, employee_user, dept_node):
     assert sorted(data.keys()) == sorted(keys + other_keys)
     for key in other_keys:
         assert isinstance(data[key], dict)
+
+
+@pytest.mark.django_db()
+def test_role_serialer(dev_role):
+    s = RoleSerializer(dev_role)
+    assert "user_set" not in s.data
 
 
 @pytest.mark.django_db()

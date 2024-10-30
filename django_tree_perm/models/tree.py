@@ -6,10 +6,9 @@ import hashlib
 from django.db import models
 from django.core.validators import RegexValidator
 
-from django_tree_perm import settings
 from django_tree_perm.utils import TREE_SPLIT_NODE_FLAG, get_tree_paths
 from .manager import TreeNodeManager, TreeNodeQuerySet
-from .utils import user_to_json, User
+from .utils import User, user_to_json, format_datetime_field
 
 
 def tree_validator() -> RegexValidator:
@@ -120,8 +119,8 @@ class TreeNode(models.Model):
                     "disabled": self.disabled,
                     "description": self.description,
                     "depth": self.depth,
-                    "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
-                    "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
+                    "created_at": format_datetime_field(self.created_at),
+                    "updated_at": format_datetime_field(self.updated_at),
                 }
             )
         return data
@@ -242,8 +241,8 @@ class Role(models.Model):
             data.update(
                 {
                     "description": self.description,
-                    "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
-                    "updated_at": self.updated_at.strftime(settings.TREE_DATETIME_FORMAT),
+                    "created_at": format_datetime_field(self.created_at),
+                    "updated_at": format_datetime_field(self.updated_at),
                 }
             )
             if path:
@@ -302,7 +301,7 @@ class NodeRole(models.Model):
             "node_id": self.node_id,
             "role_id": self.role_id,
             "user_id": self.user_id,
-            "created_at": self.created_at.strftime(settings.TREE_DATETIME_FORMAT),
+            "created_at": format_datetime_field(self.created_at),
         }
         if not partial:
             data.update(
