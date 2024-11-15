@@ -53,7 +53,8 @@ const SelectView = ({
   // 已经初始化过options,有可能会404,不重复获取
   const fetchedValues = useRef(new Set());
 
-  const getOptionValue = useCallback(item => item[fieldNames?.value || 'value'], [fieldNames]);
+  const optKey = useMemo(() => fieldNames?.value || 'value', [fieldNames]);
+  const getOptionValue = useCallback(item => item[optKey], [optKey]);
 
   const onValueChange = useCallback(
     (value, option) => {
@@ -107,19 +108,23 @@ const SelectView = ({
     }
     fetchValues.forEach(v => fetchedValues.current.add(v));
     // 根据restful接口获取详情数据初始化options
-    const promiseArr = fetchValues.map(v =>
-      requests.get(typeof genDetailUri === 'function' ? genDetailUri(v) : `${restful}${v}/`),
-    );
-    Promise.all(promiseArr).then(
-      protect(respArr => {
-        const _options = respArr.map(resp => resp.data);
-        setInnerOptions(oldOpts => {
-          const opts = _options.concat(oldOpts);
-          return opts;
-        });
+    let url;
+    if (typeof genDetailUri === 'function') {
+      url = genDetailUri(fetchValues);
+    } else {
+      url = `${restful}?${optKey}__in=${fetchValues.join(',')}`;
+    }
+    requests.get(url).then(
+      protect(resp => {
+        if (resp.data?.results?.length) {
+          setInnerOptions(oldOpts => {
+            const opts = resp.data.results.concat(oldOpts);
+            return opts;
+          });
+        }
       }),
     );
-  }, [protect, getOptionValue, innerValue, isMultiple, restful, genDetailUri, innerOptions]);
+  }, [protect, getOptionValue, innerValue, isMultiple, restful, genDetailUri, innerOptions, optKey]);
 
   useEffect(() => {
     // 搜索值变化时
