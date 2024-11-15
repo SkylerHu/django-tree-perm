@@ -7,7 +7,7 @@ module.exports = function(app) {
     app.use(
       '/tree',
       createProxyMiddleware({
-        target: 'http://127.0.0.1:8000/op/tree',
+        target: 'http://127.0.0.1:8000/tree/tree',
         changeOrigin: true,
         logLevel: 'debug',
       })

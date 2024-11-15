@@ -65,7 +65,7 @@ class PermView(BaseView):
         username = data.get("username")
         password = data.get("password")
 
-        user = authenticate(username=username, password=password)
+        user = authenticate(request, username=username, password=password)
         if user:
             login(request, user)
             data = self.gen_user_data(request, user)
@@ -77,6 +77,7 @@ class TreeNodeView(BaseListModelMixin):
 
     model = TreeNode
     filter_fields = [
+        "id__in",
         "name",
         "disabled",
         "is_key",
@@ -202,7 +203,7 @@ class TreeLoadView(BasePermissionView):
 class UserListView(BaseListModelMixin):
 
     model = User
-    filter_fields = ["username", "is_active"]
+    filter_fields = ["username", "is_active", "username__in", "id__in"]
     search_fields = ["username", "first_name", "last_name"]
     ordering = ["username"]
 
@@ -210,7 +211,7 @@ class UserListView(BaseListModelMixin):
 class UserDetailView(BaseRetrieveModelMixin):
 
     model = User
-    pk_field = "username"
+    pk_field = "username"  # User.USERNAME_FIELD
 
 
 class RoleSerializer(BaseModelSerializer):
