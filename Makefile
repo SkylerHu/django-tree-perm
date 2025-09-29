@@ -57,13 +57,12 @@ coverage: ## check code coverage quickly with the default Python
 	$(BROWSER) .coverage/htmlcov/index.html
 
 release: clean-build ## package and upload a release
-	${PYTHON} -m twine upload -r pypi dist/py*
+	${PYTHON} -m twine upload -r pypi dist/*(.whl|.tar.gz)
 
 dist: clean-build ## builds source
 	${PYTHON} setup.py sdist bdist_wheel
 	ls -l dist
-	${PYTHON} -m twine check dist/*.whl
-	${PYTHON} -m twine check dist/*.tar.gz
+	${PYTHON} -m twine check dist/*(.whl|.tar.gz)
 
 install: clean-build ## install the package to the active Python's site-packages
 	${PYTHON} setup.py install
