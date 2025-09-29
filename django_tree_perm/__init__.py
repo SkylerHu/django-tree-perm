@@ -4,7 +4,7 @@ from django.conf import settings as django_settings
 
 
 __all__ = ["settings", "VERSION"]
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 import typing
 

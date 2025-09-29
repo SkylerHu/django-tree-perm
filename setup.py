@@ -34,7 +34,6 @@ setup(
     zip_safe=False,
     platforms="any",
     install_requires=[
-        "py-enum>=1.1.1",
         "django>=3.0",
     ],
     python_requires=">=3.6",

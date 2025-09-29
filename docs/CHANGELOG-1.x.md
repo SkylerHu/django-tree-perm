@@ -1,5 +1,8 @@
 # Release Notes
 
+## 1.0.3
+- build: 去掉对 py-enum 的依赖 (项目并未使用)
+
 ## 1.0.2
 - perf: 优化前端`SelectView`在multiple下初始化options
 
